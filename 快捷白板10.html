@@ -256,6 +256,17 @@ body.camera-mode #btn-freeze{display:flex}
 .api-hint{font-size:11px;color:#999;margin-top:8px;line-height:1.5}
 .api-link{font-size:12px;color:#2DC360;cursor:pointer;text-decoration:underline;display:inline-block;margin-top:10px}
 
+/* 更新提示横幅（开屏弹窗 / 关于弹窗顶部） */
+.update-banner{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:linear-gradient(135deg,#e9fbf0,#f4fff8);border:1px solid rgba(45,195,96,.45);text-align:left;box-shadow:0 4px 14px rgba(45,195,96,.10);animation:ubIn .28s ease-out}
+.ub-main{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.ub-main>i{color:#2DC360;font-size:20px;flex-shrink:0}
+.ub-text{display:flex;flex-direction:column;line-height:1.35;min-width:0}
+.ub-text b{font-size:13.5px;color:#1f7a45}
+.ub-text span{font-size:11.5px;color:#6b7b72}
+.ub-btn{flex-shrink:0;border:none;border-radius:999px;padding:7px 12px;background:#2DC360;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(45,195,96,.3);-webkit-tap-highlight-color:transparent}
+.ub-btn:active{transform:scale(.96)}
+@keyframes ubIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
 .update-icon{width:64px;height:64px;object-fit:contain;margin:0 auto 12px;display:block}
 .update-log{text-align:left;font-size:13px;line-height:1.62;color:#444;margin:12px 0 14px}
 @media (max-height:700px){.update-log{font-size:12.5px}}
@@ -640,6 +651,9 @@ body.selecting #drawing-board{cursor:default}
 <script>
 (function(){
 'use strict';
+
+/* 单一版本源：发版时只需改这里（与 version.json / git tag 保持一致） */
+const APP_VERSION = '10.0.3';
 
 const S = {
     mode: 'whiteboard',
@@ -4312,7 +4326,7 @@ function exitPPT(){
 }
 
 function showAbout(){
-    openModal({
+    var ov = openModal({
         title:'',
         cls:'about-modal',
         content:
@@ -4324,12 +4338,13 @@ function showAbout(){
                 '<a class="about-link" href="https://parkerstudioxkissice.app.workbuddy.host/?sharecode=UZYO5WR4L6" target="_blank" rel="noopener">官方网站 https://parkerstudioxkissice.app.workbuddy.host/?sharecode=UZYO5WR4L6</a>' +
             '</div>' +
             '<div class="about-footer">' +
-                '<span>版本 10.0</span>' +
+                '<span>版本 ' + APP_VERSION + '</span>' +
                 '<span>内核 10.0.0</span>' +
                 '<span>ParkerStudio</span>' +
             '</div>',
         actions:[{ id:'close', label:'确定', type:'confirm' }]
     });
+    mountUpdateBanner(ov);
 }
 
 function showSettings(){
@@ -4595,6 +4610,133 @@ function showUpdate(){
             }}
         ]
     });
+    mountUpdateBanner(ov);
+}
+
+/* ================= 更新检查 ================= */
+/* 多源回退：jsDelivr 仓库清单 → raw 仓库清单 → GitHub Releases API。
+   任何一个源成功即止；全部失败静默退出，不影响离线/内网使用。 */
+var UPDATE_MANIFEST_URLS = [
+    'https://cdn.jsdelivr.net/gh/pythonWsr/ParkerEasiNote@main/version.json',
+    'https://raw.githubusercontent.com/pythonWsr/ParkerEasiNote/main/version.json'
+];
+var UPDATE_API_URL = 'https://api.github.com/repos/pythonWsr/ParkerEasiNote/releases/latest';
+var UPDATE_FALLBACK_URL = 'https://github.com/pythonWsr/ParkerEasiNote/releases/latest';
+var UPDATE_CHECK_INTERVAL = 24 * 3600 * 1000;
+var PENDING_UPDATE = null;
+
+function parseVersion(v){
+    return String(v || '').replace(/^v/i, '').split(/[.+-]/)
+        .filter(function(x){ return x !== ''; })
+        .map(function(x){ var n = parseInt(x, 10); return isNaN(n) ? 0 : n; });
+}
+function cmpVersion(a, b){
+    var x = parseVersion(a), y = parseVersion(b), n = Math.max(x.length, y.length);
+    for(var i = 0; i < n; i++){
+        var p = x[i] || 0, q = y[i] || 0;
+        if(p !== q) return p > q ? 1 : -1;
+    }
+    return 0;
+}
+function getJSON(url, ms){
+    return new Promise(function(resolve, reject){
+        var ctl = window.AbortController ? new AbortController() : null;
+        var timer = setTimeout(function(){
+            if(ctl){ try{ ctl.abort(); }catch(e){} }
+            reject(new Error('timeout'));
+        }, ms);
+        window.fetch(url, { cache:'no-store', signal: ctl ? ctl.signal : undefined })
+            .then(function(r){ if(!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+            .then(function(d){ clearTimeout(timer); resolve(d); })
+            .catch(function(e){ clearTimeout(timer); reject(e); });
+    });
+}
+function normalizeManifest(d){
+    if(!d || !(d.latest || d.tag_name)) return null;
+    return {
+        latest: String(d.latest || d.tag_name).replace(/^v/i, ''),
+        releaseUrl: d.release_url || d.html_url || UPDATE_FALLBACK_URL,
+        assets: d.assets || {}
+    };
+}
+function manifestFromRelease(rel){
+    var assets = {};
+    (rel.assets || []).forEach(function(a){
+        var n = String(a.name || '').toLowerCase();
+        var item = { url: a.browser_download_url, size: a.size };
+        if(/\.html?$/.test(n)) assets.html = item;
+        else if(/\.exe$/.test(n)) assets.exe = item;
+        else if(/\.apk$/.test(n)) assets.apk = item;
+    });
+    return { latest: rel.tag_name, releaseUrl: rel.html_url, assets: assets };
+}
+function loadManifest(i){
+    i = i || 0;
+    if(i >= UPDATE_MANIFEST_URLS.length){
+        return getJSON(UPDATE_API_URL, 6000).then(function(d){
+            if(!d || !d.tag_name) throw new Error('bad release');
+            return normalizeManifest(manifestFromRelease(d));
+        });
+    }
+    return getJSON(UPDATE_MANIFEST_URLS[i], 6000).then(function(d){
+        var m = normalizeManifest(d);
+        if(!m) throw new Error('bad manifest');
+        return m;
+    }).catch(function(){ return loadManifest(i + 1); });
+}
+function isPackagedApp(){
+    try{ if(/EasiNote/i.test(navigator.userAgent)) return true; }catch(e){}
+    return !!(window.AndroidBridge || window.ReactNativeWebView || window.EasiNoteApp);
+}
+function updateBannerHtml(u){
+    var assets = u.assets || {};
+    var pkg = isPackagedApp();
+    var hasHtml = !!(assets.html && assets.html.url);
+    var url = (!pkg && hasHtml) ? assets.html.url : u.releaseUrl;
+    var label = (!pkg && hasHtml) ? '下载新版' : '前往下载';
+    return '<div class="update-banner" id="update-banner">' +
+                '<div class="ub-main">' +
+                    '<i class="fas fa-arrow-circle-up"></i>' +
+                    '<div class="ub-text">' +
+                        '<b>发现新版本 v' + u.latest + '</b>' +
+                        '<span>当前 v' + APP_VERSION + (pkg ? ' · 打包版请下载新版安装包' : '') + '</span>' +
+                    '</div>' +
+                '</div>' +
+                '<button class="ub-btn" type="button" data-url="' + url + '">' + label + '</button>' +
+            '</div>';
+}
+function mountUpdateBanner(ov){
+    if(!PENDING_UPDATE || !ov) return;
+    var body = ov.querySelector ? ov.querySelector('.modal-body') : null;
+    if(!body || body.querySelector('#update-banner')) return;
+    var wrap = document.createElement('div');
+    wrap.innerHTML = updateBannerHtml(PENDING_UPDATE);
+    var el = wrap.firstChild;
+    body.insertBefore(el, body.firstChild);
+    var btn = el.querySelector('.ub-btn');
+    if(btn){
+        btn.onclick = function(e){
+            e.stopPropagation();
+            var u = btn.getAttribute('data-url');
+            try{ window.open(u, '_blank', 'noopener'); }catch(err){ location.href = u; }
+        };
+    }
+}
+function checkUpdate(){
+    if(!window.fetch) return;
+    var last = 0;
+    try{ last = parseInt(localStorage.getItem('easinote_update_ts') || '0', 10) || 0; }catch(e){}
+    if(last && Date.now() - last < UPDATE_CHECK_INTERVAL) return;
+    try{ localStorage.setItem('easinote_update_ts', String(Date.now())); }catch(e){}
+    var skipped = '';
+    try{ skipped = localStorage.getItem('easinote_skip_version') || ''; }catch(e){}
+    loadManifest(0).then(function(m){
+        if(!m || cmpVersion(m.latest, APP_VERSION) <= 0) return;
+        if(skipped && cmpVersion(m.latest, skipped) <= 0) return;
+        PENDING_UPDATE = m;
+        var ov = document.querySelector('.modal-overlay');
+        if(ov) mountUpdateBanner(ov);
+    }).catch(function(){ /* 静默：离线、限流、被墙都不打扰用户 */ });
 }
 
 /* ================= 备课模式 ================= */
@@ -6682,6 +6824,8 @@ function init(){
     });
 
     setTimeout(showUpdate, 400);
+    /* 更新检查延迟 3s：不阻塞首屏，失败静默 */
+    setTimeout(checkUpdate, 3000);
 }
 
 init();
