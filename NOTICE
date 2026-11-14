@@ -14,6 +14,30 @@ ParkerEasiNote（快捷白板10）
 原作者同意的前提下适用。若本 NOTICE 与作者的原始说明存在冲突，以作者的
 说明为准。
 
+----- 在线演示页面与 API Key 使用风险声明 -----
+
+仓库根目录的 index.html 为在线演示入口。该页面以内嵌方式加载
+快捷白板10.html 的副本，并在加载时对该副本施加限制：禁用 API Key 输入
+界面及全部 AI 相关功能。仓库中的原始文件 快捷白板10.html 未被改动。
+
+作出上述限制的原因是：在网页环境中录入第三方 API Key 存在固有风险，
+包括但不限于：Key 在网络传输过程中被截获；被浏览器扩展或开发者工具读取；
+页面被篡改或被注入恶意脚本；以及因共享设备、浏览器缓存或存储导致泄漏。
+一旦 Key 泄漏，可能产生未经授权的调用、配额消耗与费用。
+
+据此声明如下：
+
+1. 用户不应在在线演示页面，或在任何不受其自身控制的网页环境中录入 API Key。
+2. 在线演示页面及其内嵌副本按「现状」提供，仅为功能展示之用；对其可用性、
+   完整性与安全性不作任何明示或默示的保证。
+3. 若用户绕过上述限制，或在其他环境（包括本地完整版、二次分发版本及第三方
+   部署）中自行录入并使用 API Key 或相关 AI 服务，由此产生的任何费用、损失、
+   数据泄露或法律纠纷，均由用户自行承担；pythonWsr 作为代理上传者不承担
+   任何责任。
+4. 与软件本身的功能、缺陷及使用相关的问题，请径行联系原作者 ParkerStudio
+   反馈。pythonWsr 不参与软件功能的设计与维护，无权亦不就此作出任何承诺，
+   并不承担任何责任。
+
 ----- English -----
 
 Copyright (c) 2026 ParkerStudio. All rights reserved.
@@ -28,3 +52,35 @@ author's consent. Where this NOTICE and the author's instructions conflict,
 the author's instructions prevail.
 
 Any third-party components remain under their respective licenses.
+
+----- Online Demo Page and API Key Risk Disclaimer -----
+
+The file index.html in the repository root is an online demo entry point. It
+loads an embedded copy of 快捷白板10.html and applies restrictions to that copy
+at load time: the API Key input interface and all AI-related features are
+disabled. The original file, 快捷白板10.html, is not modified.
+
+These restrictions are imposed because entering a third-party API Key in a web
+page carries inherent risks, including but not limited to: interception of the
+key in transit; disclosure through browser extensions or developer tools;
+tampering with, or script injection into, the page; and leakage through shared
+devices, browser caches or storage. A leaked key may result in unauthorised
+calls, quota consumption and charges.
+
+Accordingly:
+
+1. Users must not enter an API Key into the online demo page, or into any web
+   environment outside their own control.
+2. The online demo page and its embedded copy are provided "AS IS" and for
+   demonstration purposes only, without warranties of any kind, express or
+   implied, including as to availability, integrity or security.
+3. Any charges, losses, data disclosure or disputes arising from a user
+   bypassing these restrictions, or from entering and using an API Key in any
+   other environment (including the local full version, redistributed builds
+   or third-party deployments), are borne solely by the user. pythonWsr, as
+   the authorised uploader, accepts no liability for any of the foregoing.
+4. Questions concerning the software's functionality, defects or usage should
+   be directed to the original author, ParkerStudio. pythonWsr does not design
+   or maintain the software's features and makes no representations, warranties
+   or commitments in that regard, and accepts no liability therefor.
+

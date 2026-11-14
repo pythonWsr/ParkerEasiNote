@@ -3,31 +3,190 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>快捷白板10</title>
-<!-- 临时入口页：仅跳转到 快捷白板10.html，后续可替换为正式首页 -->
-<meta http-equiv="refresh" content="0; url=./快捷白板10.html">
+<title>快捷白板10 · 在线演示</title>
+<!--
+  临时入口页：内嵌 快捷白板10.html。
+  本页面不修改原文件，仅在「内嵌副本」加载时注入限制：
+  禁用 API Key 输入与全部 AI 相关功能（原因与免责声明见仓库 NOTICE）。
+-->
 <style>
+  *{box-sizing:border-box}
   html,body{height:100%;margin:0}
-  body{display:flex;align-items:center;justify-content:center;background:#0F261E;color:#e8f5ee;
-       font:14px/1.7 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
-  .box{text-align:center;padding:28px 32px}
-  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#2DC360;
-       margin-right:8px;animation:pulse 1s ease-in-out infinite}
-  @keyframes pulse{0%,100%{opacity:.35}50%{opacity:1}}
-  h1{font-size:17px;font-weight:600;margin:0 0 10px}
-  a{color:#2DC360;text-decoration:none;border-bottom:1px solid rgba(45,195,96,.4)}
+  body{display:flex;flex-direction:column;background:#0F261E;color:#e8f5ee;
+       font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+  .embed-bar{display:flex;align-items:center;gap:8px;flex:0 0 auto;
+             padding:7px 12px;background:#12301f;border-bottom:1px solid rgba(45,195,96,.25);
+             font-size:12.5px;color:#bfe7cd}
+  .embed-bar .dot{width:7px;height:7px;border-radius:50%;background:#2DC360;flex:0 0 auto}
+  .embed-bar .txt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .embed-bar a{color:#7ee2a8;text-decoration:none;border-bottom:1px solid rgba(126,226,168,.4);white-space:nowrap}
+  #stage{position:relative;flex:1;min-height:0;background:#0F261E}
+  #app{width:100%;height:100%;border:0;display:block;background:#0F261E}
+  .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;color:#9fd4b4;font-size:13px}
+  .loading i{width:9px;height:9px;border-radius:50%;background:#2DC360;animation:p 1s ease-in-out infinite}
+  @keyframes p{0%,100%{opacity:.3}50%{opacity:1}}
+  .fallback{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
+  .fallback .card{max-width:520px;line-height:1.8}
+  .fallback h1{font-size:15px;margin:0 0 10px;color:#fff}
+  .fallback p{margin:0 0 12px;color:#a9cdb8;font-size:12.5px}
+  .fallback a{color:#7ee2a8}
 </style>
-<script>
-  /* 立即跳转；中文文件名交给 URL 自动编码 */
-  try{ location.replace(new URL('快捷白板10.html', location.href).href); }catch(e){
-    location.replace('./' + encodeURIComponent('快捷白板10.html'));
-  }
-</script>
 </head>
 <body>
-  <div class="box">
-    <h1><span class="dot"></span>正在打开 快捷白板10…</h1>
-    <a href="./快捷白板10.html">如果没有自动跳转，点这里</a>
+  <div class="embed-bar">
+    <span class="dot"></span>
+    <span class="txt">在线演示版：已禁用 API Key 输入与 AI 相关功能</span>
+    <a href="https://github.com/pythonWsr/ParkerEasiNote/blob/main/NOTICE" target="_blank" rel="noopener">说明与免责声明</a>
   </div>
+
+  <div id="stage">
+    <div class="loading" id="loading"><i></i><span>正在载入 快捷白板10…</span></div>
+    <iframe id="app" title="快捷白板10 在线演示"></iframe>
+    <div class="fallback" id="fallback">
+      <div class="card">
+        <h1>无法在线载入演示</h1>
+        <p>本页面通过脚本读取原文件并施加限制，需在 http(s) 环境下访问；
+           以本地文件方式直接打开时，浏览器会禁止该读取。</p>
+        <p>请直接打开 <a href="./快捷白板10.html">快捷白板10.html</a> 使用完整版。
+           完整版包含 AI 功能；如需录入 API Key，请自行评估并承担相应风险。</p>
+        <p>风险说明见 <a href="https://github.com/pythonWsr/ParkerEasiNote/blob/main/NOTICE" target="_blank" rel="noopener">NOTICE</a>。</p>
+      </div>
+    </div>
+  </div>
+
+<!-- 以下两段仅作为文本被读取并注入 iframe 副本，不会在本页面执行 -->
+<script type="text/plain" id="guard-css">
+#tool-ai,#ai-aura,#ai-loading,.ai-chat-overlay,.ai-menu{display:none!important}
+#set-api{display:none!important}
+</script>
+
+<script type="text/plain" id="guard-js">
+(function(){
+'use strict';
+/* 在线演示限制：禁用 API Key 与 AI 功能。原文件未被修改，限制仅作用于本内嵌副本。 */
+var BLOCK = /deepseek\.com/i;
+var MSG = '在线演示页面已禁用 API Key 与 AI 功能';
+
+/* 1. 拦截一切发往 AI 服务的请求 */
+try{
+    var origFetch = window.fetch;
+    if(typeof origFetch === 'function'){
+        window.fetch = function(input, init){
+            var url = '';
+            try{
+                if(typeof input === 'string') url = input;
+                else if(input && typeof input.href === 'string') url = input.href;
+                else if(input && typeof input.url === 'string') url = input.url;
+                else url = String(input || '');
+            }catch(e){}
+            if(BLOCK.test(url)) return Promise.reject(new Error(MSG));
+            return origFetch.apply(this, arguments);
+        };
+    }
+}catch(e){}
+
+/* 2. 禁止读写与持久化 API Key */
+try{
+    var gp = Storage.prototype.getItem, sp = Storage.prototype.setItem, rp = Storage.prototype.removeItem;
+    Storage.prototype.getItem = function(k){
+        return String(k) === 'easinote_api_key' ? null : gp.call(this, k);
+    };
+    Storage.prototype.setItem = function(k, v){
+        if(String(k) === 'easinote_api_key') return;
+        return sp.call(this, k, v);
+    };
+    Storage.prototype.removeItem = function(k){
+        if(String(k) === 'easinote_api_key'){
+            try{ return rp.call(this, k); }catch(e){ return; }
+        }
+        return rp.call(this, k);
+    };
+}catch(e){}
+try{ localStorage.removeItem('easinote_api_key'); }catch(e){}
+try{ sessionStorage.removeItem('easinote_api_key'); }catch(e){}
+
+/* 3. 隐藏 AI / API 入口，含运行时动态生成的节点 */
+var SEL = '#tool-ai,#ai-aura,#ai-loading,.ai-chat-overlay,.ai-menu,#set-api,#api-suffix';
+
+function hide(el){
+    if(!el || el.nodeType !== 1) return;
+    if(el.id === 'set-api'){
+        var row = el.closest ? el.closest('.set-row') : null;
+        if(row){ row.style.display = 'none'; row.setAttribute('aria-hidden','true'); }
+    }
+    if(el.style.display !== 'none') el.style.display = 'none';
+    el.setAttribute('aria-hidden','true');
+}
+function purge(root){
+    if(!root || root.nodeType !== 1) return;
+    try{
+        if(root.matches && root.matches(SEL)) hide(root);
+        var list = root.querySelectorAll ? root.querySelectorAll(SEL) : [];
+        for(var i = 0; i < list.length; i++) hide(list[i]);
+    }catch(e){}
+}
+function boot(){
+    purge(document.body);
+    try{
+        new MutationObserver(function(records){
+            for(var i = 0; i < records.length; i++){
+                var added = records[i].addedNodes || [];
+                for(var j = 0; j < added.length; j++) purge(added[j]);
+            }
+        }).observe(document.body, { childList:true, subtree:true });
+    }catch(e){}
+    setInterval(function(){ purge(document.body); }, 1200);
+    try{ console.warn('[在线演示] ' + MSG + '；详见仓库 NOTICE。'); }catch(e){}
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+})();
+</script>
+
+<script>
+(function(){
+'use strict';
+var APP_FILE = '快捷白板10.html';
+var loading = document.getElementById('loading');
+var fallback = document.getElementById('fallback');
+var frame = document.getElementById('app');
+
+function showFallback(){
+    if(loading) loading.style.display = 'none';
+    if(fallback) fallback.style.display = 'flex';
+}
+
+/* 把 guard-css / guard-js 注入到应用副本的 <head> 中（charset 声明之后），
+   保证先于应用自身脚本执行 */
+function injectGuards(html){
+    var css = document.getElementById('guard-css');
+    var js = document.getElementById('guard-js');
+    var block = '<style id="embed-guard-style">' + (css ? css.textContent : '') + '</style>' +
+                '<script id="embed-guard-js">' + (js ? js.textContent : '') + '<\/script>';
+    var m = /<meta[^>]+charset[^>]*>/i.exec(html) || /<head([^>]*)>/i.exec(html);
+    if(!m) return block + html;
+    return html.slice(0, m.index + m[0].length) + block + html.slice(m.index + m[0].length);
+}
+
+function load(){
+    if(!window.fetch || !('srcdoc' in frame)){ showFallback(); return; }
+    if(location.protocol === 'file:'){ showFallback(); return; }
+    fetch('./' + encodeURIComponent(APP_FILE), { cache:'no-cache' })
+        .then(function(r){
+            if(!r.ok) throw new Error('HTTP ' + r.status);
+            return r.text();
+        })
+        .then(function(html){
+            if(!html || html.indexOf('<html') === -1) throw new Error('bad html');
+            frame.addEventListener('load', function(){
+                if(loading) loading.style.display = 'none';
+            }, { once:true });
+            frame.srcdoc = injectGuards(html);
+        })
+        .catch(function(){ showFallback(); });
+}
+load();
+})();
+</script>
 </body>
 </html>
