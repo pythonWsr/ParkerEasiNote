@@ -4,6 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>快捷白板10</title>
+<script>
+/* 部署约束：同目录存在 DELETEME.md 时，视为网页部署环境，
+   重定向到 index.html（在线演示版，已禁用 API Key 与 AI 功能）。
+   仅对顶层文档生效；被 index.html 以 srcdoc 内嵌时不重定向，避免循环。
+   以 file:// 打开时不做检查，离线完整版行为不变。 */
+(function(){
+    try{
+        if(window.top !== window.self) return;
+        if(location.protocol === 'file:') return;
+        fetch('DELETEME.md', { method:'HEAD', cache:'no-store' }).then(function(r){
+            if(r && r.ok) location.replace('./index.html');
+        }).catch(function(){});
+    }catch(e){}
+})();
+</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <!-- 优先使用本地 JSZip；缺失时自动使用内置 MiniZip（离线可用，无需联网） -->
@@ -653,7 +668,7 @@ body.selecting #drawing-board{cursor:default}
 'use strict';
 
 /* 单一版本源：发版时只需改这里（与 version.json / git tag 保持一致） */
-const APP_VERSION = '10.0.3';
+const APP_VERSION = '10.0.4';
 
 const S = {
     mode: 'whiteboard',

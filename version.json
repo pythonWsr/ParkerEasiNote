@@ -1,16 +1,16 @@
 {
   "schema": 1,
-  "latest": "10.0.3",
-  "released": "2026-11-14T22:50:00+08:00",
+  "latest": "10.0.4",
+  "released": "2026-11-15T01:30:00+08:00",
   "channel": "stable",
   "min_supported": "10.0.0",
-  "release_url": "https://github.com/pythonWsr/ParkerEasiNote/releases/tag/v10.0.3",
-  "notes": "启动时自动检测新版本；开屏弹窗内新增 MIT 许可折叠区。",
+  "release_url": "https://github.com/pythonWsr/ParkerEasiNote/releases/tag/v10.0.4",
+  "notes": "网页部署环境下自动引导到在线演示页；离线完整版行为不变。",
   "assets": {
     "html": {
-      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.0.3/ParkerEasiNote-10.0.3.html",
-      "size": 324660,
-      "sha256": "7aa3f0a02fa7ef1efe0dc1fc5d9f6e17fb622daa8119400f06df24a22be0ecfb"
+      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.0.4/ParkerEasiNote-10.0.4.html",
+      "size": 327238,
+      "sha256": "7328eaf1cb78f6bfd5c62d821010c1dcf77185b614b1b6069d23e4d386643a18"
     }
   }
 }
