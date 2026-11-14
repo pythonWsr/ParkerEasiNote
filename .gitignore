@@ -1,0 +1,15 @@
+# 打包产物 / 二进制安装包：仅通过 GitHub Release 分发，不进入仓库历史
+*.exe
+*.msi
+*.apk
+*.aab
+*.ipa
+*.dmg
+*.app
+*.zip
+*.7z
+*.rar
+
+# 系统 / 编辑器杂项
+.DS_Store
+Thumbs.db
