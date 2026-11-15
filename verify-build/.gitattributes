@@ -1,0 +1,3 @@
+# 构建输入按原样存储/检出，禁止 Git 做 CRLF 转换，
+# 保证 Windows runner 上检出的 payload 与仓库逐字节一致（构建可复现）
+* -text

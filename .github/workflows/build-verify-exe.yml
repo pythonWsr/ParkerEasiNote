@@ -43,6 +43,13 @@ jobs:
       - name: List output
         run: Get-ChildItem dist -Recurse | Select-Object FullName,Length | Format-Table -AutoSize
 
+      - name: Verify asar contents
+        run: |
+          npx --yes asar list dist/win-unpacked/resources/app.asar
+          Write-Host '--- 明文泄漏检查（应全部为 0）---'
+          $hits = Select-String -Path dist/win-unpacked/resources/app.asar -Pattern '机器人验证','verifyBox' -SimpleMatch -ErrorAction SilentlyContinue
+          if ($hits) { Write-Error 'asar 中出现明文页面片段'; exit 1 } else { Write-Host 'OK: asar 中无明文页面片段' }
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
