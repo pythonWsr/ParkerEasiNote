@@ -1,0 +1,6 @@
+# 依赖与构建产物
+node_modules/
+dist/
+
+# 构建期生成的加密载荷（含密文，每次构建重新生成，不提交）
+electron/secure-payload.js

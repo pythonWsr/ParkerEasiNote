@@ -1,0 +1,54 @@
+name: build-verify-exe
+
+# 仅在 test 分支上构建；html 与构建配置都不进入 main
+on:
+  push:
+    branches: [test]
+    paths:
+      - 'verify-build/**'
+      - '.github/workflows/build-verify-exe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Windows portable exe
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: verify-build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: verify-build/package-lock.json
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Encrypt payload (AES-256-GCM)
+        run: node scripts/encrypt.js
+
+      - name: Build portable exe
+        run: npx electron-builder --win portable --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: List output
+        run: Get-ChildItem dist -Recurse | Select-Object FullName,Length | Format-Table -AutoSize
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: verify-exe
+          path: verify-build/dist/*.exe
+          if-no-files-found: error
+          retention-days: 7

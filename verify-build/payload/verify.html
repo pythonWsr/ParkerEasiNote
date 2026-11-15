@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>机器人验证</title>
+    <style>
+        *{
+            box-sizing: border-box;
+            font-family: system-ui;
+        }
+        body{
+            background:#222;
+            color:#fff;
+            display:flex;
+            flex-direction: column;
+            justify-content:center;
+            align-items:center;
+            min-height:100vh;
+            margin:0;
+        }
+        .box{
+            background:#333;
+            padding:32px;
+            border-radius:12px;
+            width:420px;
+        }
+        h2{
+            margin-top:0;
+            color:#ff7b7b;
+        }
+        .math{
+            font-size:22px;
+            background:#111;
+            padding:12px;
+            border-radius:8px;
+            margin:16px 0;
+        }
+        input{
+            width:100%;
+            padding:12px;
+            font-size:18px;
+            border-radius:6px;
+            border:none;
+            outline:none;
+        }
+        button{
+            width:100%;
+            margin-top:14px;
+            padding:12px;
+            font-size:18px;
+            background:#3b82f6;
+            color:white;
+            border:none;
+            border-radius:6px;
+            cursor:pointer;
+        }
+        .tip{
+            margin-top:14px;
+            font-size:16px;
+        }
+        .ok{
+            color:#4ade80;
+        }
+        .err{
+            color:#f87171;
+        }
+        .author{
+            margin-top:24px;
+            color:#aaa;
+            font-size:14px;
+        }
+        /* 加载进度条区域，默认隐藏 */
+        .loading-box{
+            display:none;
+            width:420px;
+            text-align:center;
+        }
+        .loading-text{
+            font-size:18px;
+            margin-bottom:12px;
+        }
+        .progress-bg{
+            width:100%;
+            height:24px;
+            background:#111;
+            border-radius:12px;
+            overflow:hidden;
+        }
+        .progress-bar{
+            height:100%;
+            width:0%;
+            background:#4ade80;
+            transition: width 0.05s linear;
+        }
+        /* 成功页面，默认隐藏 */
+        .success-page{
+            display:none;
+            text-align:center;
+        }
+        .success-title{
+            font-size:36px;
+            color:#4ade80;
+            margin-bottom:20px;
+        }
+        .success-desc{
+            font-size:22px;
+        }
+    </style>
+</head>
+<body>
+<!-- 验证界面 -->
+<div class="box" id="verifyBox">
+    <h2>机器人验证</h2>
+    <p>我们怀疑你是人类。请计算下面算式，证明你是机器人：</p>
+    <div class="math">0.1 + 0.2 = ?</div>
+    <input id="ans" placeholder="在此输入答案">
+    <button onclick="check()">提交验证</button>
+    <div class="tip" id="msg"></div>
+</div>
+
+<!-- 进度条加载界面 -->
+<div class="loading-box" id="loadingBox">
+    <div class="loading-text">正在校验机器人身份...</div>
+    <div class="progress-bg">
+        <div class="progress-bar" id="bar"></div>
+    </div>
+</div>
+
+<!-- 成功彩蛋页面，默认隐藏 -->
+<div class="success-page" id="successBox">
+    <div class="success-title">验证通过</div>
+    <div class="success-desc">你掌握了计算机浮点数的秘密</div>
+</div>
+
+<div class="author">作者：@我是电脑糕手</div>
+
+<script>
+const correct = "0.30000000000000004";
+function check(){
+    const val = document.getElementById('ans').value.trim();
+    const msgDom = document.getElementById('msg');
+    if(val === correct){
+        // 删除输入框下方绿色✅提示，直接进入加载流程
+        setTimeout(()=>{
+            document.getElementById('verifyBox').style.display = "none";
+            document.getElementById('loadingBox').style.display = "block";
+            // 进度条动画
+            let progress = 0;
+            const bar = document.getElementById("bar");
+            const timer = setInterval(()=>{
+                progress += 1;
+                bar.style.width = progress + "%";
+                if(progress >= 100){
+                    clearInterval(timer);
+                    // 进度走完，切换到成功彩蛋页面
+                    setTimeout(()=>{
+                        document.getElementById('loadingBox').style.display = "none";
+                        document.getElementById('successBox').style.display = "block";
+                    },400);
+                }
+            },30);
+        },800);
+    }else{
+        // 错误提示保留
+        msgDom.className = "tip err";
+        msgDom.innerText = "❌ 验证失败！你是人类";
+    }
+}
+</script>
+</body>
+</html>
