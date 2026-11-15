@@ -58,7 +58,7 @@ jobs:
              src\main.cpp ^
              /link /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /INCREMENTAL:NO ^
              /OUT:dist\VerifyDemo.exe ^
-             user32.lib gdi32.lib ole32.lib oleaut32.lib bcrypt.lib ^
+             user32.lib gdi32.lib ole32.lib oleaut32.lib advapi32.lib bcrypt.lib ^
              "%RUNNER_TEMP%\wv2\build\native\x64\WebView2LoaderStatic.lib"
 
       - name: Verify artifact
