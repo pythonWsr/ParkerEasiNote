@@ -53,7 +53,7 @@ jobs:
         shell: cmd
         run: |
           if not exist dist mkdir dist
-          cl /nologo /std:c++17 /EHsc /O1 /Os /MT /DUNICODE /D_UNICODE /DNDEBUG ^
+          cl /nologo /std:c++17 /EHsc /utf-8 /O1 /Os /MT /DUNICODE /D_UNICODE /DNDEBUG ^
              /I "%RUNNER_TEMP%\wv2\build\native\include" ^
              src\main.cpp ^
              /link /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /INCREMENTAL:NO ^
@@ -70,6 +70,21 @@ jobs:
           Write-Host '--- 明文泄漏检查（应无命中）---'
           $hits = Select-String -Path $exe.FullName -Pattern 'verifyBox','0.30000000000000004','loadingBox','我们怀疑你是人类' -SimpleMatch -ErrorAction SilentlyContinue
           if ($hits) { Write-Error 'exe 中出现明文页面内容'; exit 1 } else { Write-Host 'OK: 无可读页面内容' }
+
+          Write-Host '--- UTF-16 中文串检查（验证 /utf-8 生效）---'
+          $u16 = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($exe.FullName))
+          foreach ($s in @('机器人验证','页面数据解密失败')) {
+            if (-not $u16.Contains($s)) { Write-Error ("未找到 UTF-16 字符串: " + $s); exit 1 }
+          }
+          Write-Host 'OK: 中文提示串为正常 UTF-16'
+
+      - name: Selftest (run decryption in the real binary)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath (Resolve-Path dist\VerifyDemo.exe) -ArgumentList '--selftest' -PassThru -Wait
+          Write-Host ("--selftest 退出码: " + $p.ExitCode)
+          if ($p.ExitCode -ne 0) { Write-Error "解密自检失败，退出码 $($p.ExitCode)"; exit 1 }
+          Write-Host 'OK: 二进制内解密链路正常'
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

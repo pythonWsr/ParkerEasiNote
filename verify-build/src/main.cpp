@@ -14,6 +14,7 @@
 #include <bcrypt.h>
 #include <wrl.h>
 #include <cstring>
+#include <cwchar>
 #include <string>
 #include <vector>
 #include "WebView2.h"
@@ -44,7 +45,12 @@ std::string DecryptPayload() {
     BYTE key[32] = {0};
 
     BCRYPT_ALG_HANDLE hSha = nullptr;
-    if (BCryptOpenAlgorithmProvider(&hSha, BCRYPT_SHA256_ALGORITHM, nullptr, 0) != 0) return std::string();
+    /* PBKDF2 的 PRF 句柄必须带 BCRYPT_ALG_HANDLE_HMAC_FLAG，否则 BCryptDeriveKeyPBKDF2
+       返回 STATUS_INVALID_PARAMETER，表现为「页面数据解密失败」 */
+    if (BCryptOpenAlgorithmProvider(&hSha, BCRYPT_SHA256_ALGORITHM, nullptr,
+                                    BCRYPT_ALG_HANDLE_HMAC_FLAG) != 0) {
+        return std::string();
+    }
     NTSTATUS st = BCryptDeriveKeyPBKDF2(
         hSha,
         reinterpret_cast<PUCHAR>(const_cast<char*>(pass.data())),
@@ -188,6 +194,15 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int) {
+    /* 自检模式：只跑解密链路，不建窗口。CI 用来验证真实二进制里的解密是否正常。
+       返回 0 = 成功，2 = 解密失败。 */
+    if (wcsstr(GetCommandLineW(), L"--selftest") != nullptr) {
+        std::string probe = DecryptPayload();
+        const bool ok = probe.size() > 100 && probe.compare(0, 14, "<!DOCTYPE html") == 0;
+        SecureZeroMemory(&probe[0], probe.size());
+        return ok ? 0 : 2;
+    }
+
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
     std::string html8 = DecryptPayload();
