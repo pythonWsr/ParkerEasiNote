@@ -21,10 +21,10 @@
 </script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
-<!-- 优先使用本地 JSZip；缺失时自动使用内置 MiniZip（离线可用，无需联网） -->
-<script src="src/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/promise-polyfill@8.2.3/dist/polyfill.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pptx-preview@1.0.2/dist/pptx-preview.umd.js"></script>
 <script>
 if (typeof pdfjsLib !== 'undefined') pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 </script>
@@ -668,7 +668,7 @@ body.selecting #drawing-board{cursor:default}
 'use strict';
 
 /* 单一版本源：发版时只需改这里（与 version.json / git tag 保持一致） */
-const APP_VERSION = '10.0.4';
+const APP_VERSION = '10.0.5';
 
 const S = {
     mode: 'whiteboard',
@@ -678,6 +678,7 @@ const S = {
     penColor: '#ffffff',
     penThickness: 4,
     eraserSize: 64,
+    fileInk: {},
     /* 手势橡皮：笔模式下用较大接触面积（手掌/拇指侧面）擦除，抬手自动回到笔 */
     gestureEraser: localStorage.getItem('easinote_gesture_eraser') !== '0',
     gestureSens: (function(){
@@ -961,18 +962,39 @@ function syncBaseTransform(k){
 }
 
 function getElements(){
-    if(S.mode==='ppt' && S.ppt && S.ppt.slides[S.slideIdx]) return S.ppt.slides[S.slideIdx].elements;
+    if(S.mode==='ppt' && S.ppt){
+        var key = 'ppt:' + S.slideIdx;
+        if(!S.fileInk[key]) S.fileInk[key] = [];
+        // 兼容旧逻辑：如果 slide.elements 存在且非空，用它
+        if(S.ppt.slides[S.slideIdx] && S.ppt.slides[S.slideIdx].elements && S.ppt.slides[S.slideIdx].elements.length){
+            return S.ppt.slides[S.slideIdx].elements;
+        }
+        return S.fileInk[key];
+    }
+    if(S.mode==='doc' && S.doc){
+        var key = 'doc:' + S.docIdx;
+        if(!S.fileInk[key]) S.fileInk[key] = [];
+        return S.fileInk[key];
+    }
     if(S.mode==='prep'){
         var pg = S.prep && S.prep.pages[S.prepIdx];
         if(!pg) return null;
         if(!pg.ink) pg.ink = [];
         return pg.ink;
     }
-    if(S.mode==='doc' || S.mode==='present') return null;
+    if(S.mode==='present') return null;
     return (S.pages[S.pageIdx] || {elements:[]}).elements;
 }
 function setElements(arr){
-    if(S.mode==='ppt' && S.ppt && S.ppt.slides[S.slideIdx]) S.ppt.slides[S.slideIdx].elements = arr;
+    if(S.mode==='ppt' && S.ppt && S.ppt.slides[S.slideIdx]){
+        var key = 'ppt:' + S.slideIdx;
+        S.fileInk[key] = arr;
+        S.ppt.slides[S.slideIdx].elements = arr;
+    }
+    else if(S.mode==='doc' && S.doc){
+        var key = 'doc:' + S.docIdx;
+        S.fileInk[key] = arr;
+    }
     else if(S.mode==='prep' && S.prep && S.prep.pages[S.prepIdx]) S.prep.pages[S.prepIdx].ink = arr;
     else if(S.mode==='whiteboard' || S.mode==='camera') S.pages[S.pageIdx].elements = arr;
 }
@@ -1730,7 +1752,19 @@ function onUp(e){
         }
         if(S.activePtrs) S.activePtrs.delete(id);
     }
-    if(committed){ invalidateInk(); pushHistory(); }
+    if(committed){
+        invalidateInk();
+        pushHistory();
+        // PPT/Word 模式下强制保存到 fileInk
+        if(S.mode === 'ppt' || S.mode === 'doc'){
+            var arr = getElements();
+            if(S.mode === 'ppt' && S.ppt && S.ppt.slides[S.slideIdx]){
+                S.ppt.slides[S.slideIdx].elements = arr;
+            }
+            var key = S.mode + ':' + (S.mode === 'ppt' ? S.slideIdx : S.docIdx);
+            S.fileInk[key] = arr;
+        }
+    }
     redraw();
 }
 
@@ -1777,7 +1811,14 @@ function snapElements(){
 }
 
 function makeSnap(){
-    return { mode:S.mode, page:S.pageIdx, slide:S.slideIdx, prep:S.prepIdx, data:snapElements() };
+    return { 
+        mode:S.mode, 
+        page:S.pageIdx, 
+        slide:S.slideIdx, 
+        prep:S.prepIdx, 
+        doc:S.docIdx,
+        data:snapElements() 
+    };
 }
 
 function resetHistory(){
@@ -1806,6 +1847,15 @@ function clearHistStacks(){
     S._histKey = null;
 }
 
+function undo(){
+    if(!S.history || !S.history.length || S.hIndex <= 0){
+        toast('没有可撤销的操作','fa-undo');
+        return;
+    }
+    S.hIndex--;
+    restoreSnap(S.history[S.hIndex]);
+}
+
 function pushHistory(){
     var snap = makeSnap();
     if(!snap.data) return;
@@ -1827,7 +1877,15 @@ function restoreSnap(h){
     if(h.mode === 'ppt' && S.ppt){
         S.slideIdx = h.slide || 0;
         if(S.ppt.slides[S.slideIdx]) S.ppt.slides[S.slideIdx].elements = data;
+        // 同步 fileInk
+        var key = 'ppt:' + S.slideIdx;
+        S.fileInk[key] = data;
         renderPPT();
+    } else if(h.mode === 'doc' && S.doc){
+        S.docIdx = h.doc || 0;
+        var key2 = 'doc:' + S.docIdx;
+        S.fileInk[key2] = data;
+        renderDoc();
     } else if(h.mode === 'prep' && S.prep){
         S.prepIdx = h.prep || 0;
         var pg0 = S.prep.pages[S.prepIdx];
@@ -1845,15 +1903,6 @@ function restoreSnap(h){
     }
     invalidateInk();
     updatePageThumbnails();
-}
-
-function undo(){
-    if(!S.history || !S.history.length || S.hIndex <= 0){
-        toast('没有可撤销的操作','fa-undo');
-        return;
-    }
-    S.hIndex--;
-    restoreSnap(S.history[S.hIndex]);
 }
 
 var submenuTimer = null;
@@ -2742,28 +2791,90 @@ function openAnyFile(f){
 }
 
 function importPptx(f){
+    // 检查库是否加载
+    var lib = window.pptxPreview || window.PPTXPreview || window.pptx;
+    if(!lib || typeof lib.init !== 'function'){
+        toast('pptx-preview 库未加载，请检查网络或 CDN','fa-exclamation-triangle');
+        return;
+    }
+
     toast('正在解析 PPT，请稍候…','fa-spinner');
     var t0 = Date.now();
-    parsePPTX(f).then(function(data){
-        if(!data.slides.length){ toast('未解析到幻灯片','fa-exclamation-triangle'); return; }
-        exitPrepSilent();
-        S.ppt = data;
-        S.mode = 'ppt';
-        S.slideIdx = 0;
-        S.tool = 'pen';
-        clearHistStacks();
-        resetHistory();
-        S.selection.object = null;
-        document.body.classList.add('ppt-mode');
-        document.body.classList.remove('prep-mode','doc-mode');
-        $('menu-exit-ppt').classList.remove('hidden');
-        updatePptUi(true);
-        renderPPT();
-        toast('PPT 加载成功（'+data.slides.length+' 页，'+(Date.now()-t0)+'ms）','fa-check');
-    }).catch(function(err){
+
+    // 准备一个隐藏容器给 pptx-preview 渲染
+    var mount = document.createElement('div');
+    mount.style.cssText = 'position:absolute;left:-30000px;top:0;width:1280px;height:720px;overflow:hidden;';
+    document.body.appendChild(mount);
+
+    try{
+        var previewer = lib.init(mount, { width: 1280, height: 720 });
+        Promise.resolve(previewer.preview(f)).then(function(){
+            // 等渲染完成，提取每一页
+            return new Promise(function(res){
+                var tries = 0;
+                (function poll(){
+                    var slideEls = mount.querySelectorAll('.pptx-preview-wrapper > div');
+                    if(slideEls.length === 0) slideEls = mount.querySelectorAll('.slide');
+                    if(slideEls.length > 0) return res(slideEls);
+                    if(++tries > 100) return res(null); // 10秒超时
+                    setTimeout(poll, 100);
+                })();
+            });
+        }).then(function(slideEls){
+            document.body.removeChild(mount);
+            if(!slideEls || !slideEls.length){
+                toast('PPT 解析失败：未渲染出任何幻灯片','fa-exclamation-triangle');
+                return;
+            }
+
+            // 提取每页的 HTML，作为 pptx-preview 的渲染结果
+            var slides = [];
+            slideEls.forEach(function(el, i){
+                slides.push({
+                    index: i,
+                    html: el.innerHTML,
+                    // 保留一个空 shapes 数组，兼容原有代码中读取 shapes 的地方
+                    shapes: [],
+                    anim: { steps: [], immediateIds: [] },
+                    bg: { color: '#ffffff', image: null, imagePath: null }
+                });
+            });
+
+            // 拿到尺寸（pptx-preview 一般按容器尺寸渲染）
+            var w = 1280, h = 720;
+
+            var data = {
+                width: w,
+                height: h,
+                slides: slides,
+                zip: null,
+                _previewMode: true  // 标记：这个 PPT 由 pptx-preview 渲染
+            };
+
+            exitPrepSilent();
+            S.ppt = data;
+            S.mode = 'ppt';
+            S.slideIdx = 0;
+            S.tool = 'pen';
+            clearHistStacks();
+            resetHistory();
+            S.selection.object = null;
+            document.body.classList.add('ppt-mode');
+            document.body.classList.remove('prep-mode','doc-mode');
+            $('menu-exit-ppt').classList.remove('hidden');
+            updatePptUi(true);
+            renderPPT();
+            toast('PPT 加载成功（'+data.slides.length+' 页，'+(Date.now()-t0)+'ms）','fa-check');
+        }).catch(function(err){
+            if(mount.parentNode) document.body.removeChild(mount);
+            console.error('pptx-preview 解析失败:', err);
+            toast('PPT 解析失败：' + (err.message || '未知错误'),'fa-exclamation-triangle');
+        });
+    }catch(err){
+        if(mount.parentNode) document.body.removeChild(mount);
         console.error(err);
-        toast('PPT 解析失败：' + err.message,'fa-exclamation-triangle');
-    });
+        toast('PPT 解析失败：' + (err.message || '未知错误'),'fa-exclamation-triangle');
+    }
 }
 
 D.filePpt.onchange = function(e){
@@ -3501,27 +3612,47 @@ function buildPptSlide(){
     stage.className = 'ppt-stage';
     stage.style.width = S.ppt.width + 'px';
     stage.style.height = S.ppt.height + 'px';
+    stage.style.background = '#ffffff';
 
     var slide = S.ppt.slides[S.slideIdx];
     if(slide){
-        if (slide.bg.image) {
-            stage.style.backgroundImage = 'url('+slide.bg.image+')';
+        if(S.ppt._previewMode){
+            // pptx-preview 模式：直接把 html 塞进去
+            stage.innerHTML = slide.html || '';
+            // pptx-preview 的内容可能自带缩放，强制铺满 stage
+            var inner = stage.firstElementChild;
+            if(inner){
+                inner.style.width = '100%';
+                inner.style.height = '100%';
+                inner.style.transform = 'none';
+                inner.style.position = 'relative';
+                inner.style.left = '0';
+                inner.style.top = '0';
+            }
         } else {
-            stage.style.backgroundImage = 'none';
-            stage.style.backgroundColor = slide.bg.color || '#ffffff';
+            // 原有模式：按 shapes 渲染（兼容旧数据）
+            if (slide.bg.image) {
+                stage.style.backgroundImage = 'url('+slide.bg.image+')';
+            } else {
+                stage.style.backgroundImage = 'none';
+                stage.style.backgroundColor = slide.bg.color || '#ffffff';
+            }
+            ensureSlideImages(slide);
+            var immediateSet = {};
+            (slide.anim.immediateIds || []).forEach(function(id){ immediateSet[id] = true; });
+            var frag = document.createDocumentFragment();
+            (slide.shapes || []).forEach(function(s){
+                frag.appendChild(mkPptShape(s, immediateSet[s.id]));
+            });
+            stage.appendChild(frag);
         }
-        ensureSlideImages(slide);
-        var immediateSet = {};
-        slide.anim.immediateIds.forEach(function(id){ immediateSet[id] = true; });
-        var frag = document.createDocumentFragment();
-        slide.shapes.forEach(function(s){
-            frag.appendChild(mkPptShape(s, immediateSet[s.id]));
-        });
-        stage.appendChild(frag);
     }
     viewport.appendChild(stage);
+    D.bg.innerHTML = '';
     D.bg.appendChild(viewport);
+	invalidateInk();
     scaleStage();
+	redraw();
 }
 
 /* 幻灯片元素渲染：多边形用 SVG 绘制，保证填充/描边贴合形状，文字层不被裁切 */
@@ -3715,20 +3846,28 @@ $('btn-prev-page').onclick = function(){
 
 $('btn-next-page').onclick = function(){
     if(S.mode==='ppt'){
-        var slide = S.ppt.slides[S.slideIdx];
-        if (slide) {
-            var visibleShapes = D.bg.querySelectorAll('.shape.visible');
-            var visibleIds = Array.prototype.map.call(visibleShapes, function(el){ return el.dataset.shapeId; });
-            var nextStep = slide.anim.steps.find(function(step){ return step.shapeIds.some(function(id){ return visibleIds.indexOf(id) === -1; }); });
-            
-            if (nextStep) {
-                nextStep.shapeIds.forEach(function(id){
-                    var el = D.bg.querySelector('.shape[data-shape-id="'+id+'"]');
-                    if (el) el.classList.add('visible');
-                });
-            } else if (S.slideIdx < S.ppt.slides.length - 1) {
-                S.slideIdx++; 
+        if(S.ppt && S.ppt._previewMode){
+            // pptx-preview 模式：直接翻页，不处理动画步骤
+            if(S.slideIdx < S.ppt.slides.length - 1){
+                S.slideIdx++;
                 renderPPT();
+            }
+        } else {
+            var slide = S.ppt.slides[S.slideIdx];
+            if (slide) {
+                var visibleShapes = D.bg.querySelectorAll('.shape.visible');
+                var visibleIds = Array.prototype.map.call(visibleShapes, function(el){ return el.dataset.shapeId; });
+                var nextStep = (slide.anim.steps || []).find(function(step){ return step.shapeIds.some(function(id){ return visibleIds.indexOf(id) === -1; }); });
+                
+                if (nextStep) {
+                    nextStep.shapeIds.forEach(function(id){
+                        var el = D.bg.querySelector('.shape[data-shape-id="'+id+'"]');
+                        if (el) el.classList.add('visible');
+                    });
+                } else if (S.slideIdx < S.ppt.slides.length - 1) {
+                    S.slideIdx++; 
+                    renderPPT();
+                }
             }
         }
     } else if(S.mode==='prep'){
@@ -3933,8 +4072,92 @@ function paintThumb(item, set, token){
     tc.fillRect(0, 0, cw, ch);
 
     if(set.kind === 'ppt'){
-        /* 幻灯片图片是按需从压缩包里解码的：缩略图要主动触发一次，解完再补画，
-           否则没翻到过的页面会一直是空白缩略图 */
+        /* ---- pptx-preview 模式：用 DOM 快照生成缩略图 ---- */
+        if(S.ppt && S.ppt._previewMode){
+            /* 用一个离屏 DOM 渲染当前页 HTML，再用 html2canvas 思路太复杂。
+               这里采用简化方案：直接把 pptx-preview 渲染的 HTML 克隆到一个
+               绝对定位的层里，用 CSS transform 缩放，然后叠在 canvas 上方。
+               但 paintThumb 只能画 canvas，所以退一步：在 canvas 上画一个
+               白底 + 页码 + 首行文字预览，够用且不会出现空白缩略图。 */
+            tc.fillStyle = '#ffffff';
+            tc.fillRect(ox, oy, dw, dh);
+
+            /* 尝试从 HTML 中提取首段文字作为预览 */
+            var previewText = '';
+            try{
+                var tmp = document.createElement('div');
+                tmp.innerHTML = pg.html || '';
+                /* pptx-preview 的文字通常在 <p> / <span> / <div> 里 */
+                var txtEl = tmp.querySelector('p, span, div');
+                if(txtEl) previewText = (txtEl.textContent || '').trim();
+                if(!previewText) previewText = (tmp.textContent || '').trim();
+            }catch(e){}
+            previewText = previewText.replace(/\s+/g, ' ').slice(0, 40);
+
+            /* 顶部页码条 */
+            tc.fillStyle = '#3b82f6';
+            tc.fillRect(ox, oy, dw, Math.max(2, dh * 0.045));
+
+            /* 页码 */
+            tc.fillStyle = '#ffffff';
+            tc.font = 'bold ' + Math.max(5, dh * 0.055) + 'px sans-serif';
+            tc.textBaseline = 'middle';
+            tc.textAlign = 'left';
+            tc.fillText('P' + (pg.index + 1), ox + Math.max(2, dw * 0.03), oy + Math.max(2, dh * 0.022));
+
+            /* 正文预览文字 */
+            if(previewText){
+                tc.fillStyle = '#334155';
+                tc.font = Math.max(4, dh * 0.048) + 'px sans-serif';
+                tc.textBaseline = 'top';
+                tc.textAlign = 'left';
+                var maxW = Math.max(8, dw - Math.max(4, dw * 0.06));
+                var lineH = Math.max(5, dh * 0.062);
+                var startX = ox + Math.max(2, dw * 0.03);
+                var startY = oy + Math.max(6, dh * 0.09);
+                /* 手动折行 */
+                var lines = [];
+                var cur = '';
+                for(var ci = 0; ci < previewText.length; ci++){
+                    var test = cur + previewText.charAt(ci);
+                    if(tc.measureText(test).width > maxW && cur){
+                        lines.push(cur);
+                        cur = previewText.charAt(ci);
+                    } else {
+                        cur = test;
+                    }
+                }
+                if(cur) lines.push(cur);
+                lines.slice(0, Math.floor((dh * 0.82) / lineH)).forEach(function(line, li){
+                    tc.fillText(line, startX, startY + li * lineH);
+                });
+            } else {
+                /* 没文字就画一个简单的"幻灯片"占位图标 */
+                tc.fillStyle = '#e2e8f0';
+                var iconW = dw * 0.5, iconH = dh * 0.28;
+                var iconX = ox + (dw - iconW) / 2, iconY = oy + (dh - iconH) / 2;
+                tc.fillRect(iconX, iconY, iconW, iconH);
+                tc.fillStyle = '#94a3b8';
+                tc.font = 'bold ' + Math.max(5, dh * 0.07) + 'px sans-serif';
+                tc.textAlign = 'center';
+                tc.textBaseline = 'middle';
+                tc.fillText('幻灯片', ox + dw / 2, oy + dh / 2);
+                tc.textAlign = 'left';
+            }
+
+            /* 底部浅色横条装饰，让缩略图看起来更像页面 */
+            tc.fillStyle = 'rgba(148,163,184,0.18)';
+            tc.fillRect(ox + dw * 0.03, oy + dh * 0.88, dw * 0.94, Math.max(1, dh * 0.012));
+
+            /* 边框 */
+            tc.setTransform(dpr, 0, 0, dpr, 0, 0);
+            tc.strokeStyle = 'rgba(128,148,166,.35)';
+            tc.lineWidth = 1;
+            tc.strokeRect(ox + 0.5, oy + 0.5, Math.max(1, dw - 1), Math.max(1, dh - 1));
+            return;
+        }
+
+        /* ---- 原有自研解析模式：按 shapes 逐元素绘制 ---- */
         var needBg = !!(pg.bg && pg.bg.imagePath && !pg.bg.image);
         if(needBg) ensureSlideImages(pg);
         (pg.shapes || []).forEach(function(s){
@@ -5716,6 +5939,7 @@ function exitFileMode(silent){
     S.mode = 'whiteboard';
     S.ppt = null;
     S.doc = null;
+	S.fileInk = {};
     document.body.classList.remove('ppt-mode','doc-mode');
     $('menu-exit-ppt').classList.add('hidden');
     updatePptUi(false);
@@ -6362,7 +6586,9 @@ function buildDocStage(){
     stage.appendChild(page);
     vp.appendChild(stage);
     D.bg.appendChild(vp);
+	invalidateInk();
     scaleStage();
+	redraw();
 }
 
 
