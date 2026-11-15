@@ -1,6 +1,11 @@
-# 依赖与构建产物
-node_modules/
+# 构建产物
 dist/
+*.obj
+*.pdb
+*.ilk
 
-# 构建期生成的加密载荷（含密文，每次构建重新生成，不提交）
-electron/secure-payload.js
+# 构建期生成的加密载荷（每次构建重新生成，不提交）
+src/payload_data.h
+
+# 旧链路（Electron）遗留
+node_modules/

@@ -12,9 +12,12 @@ on:
 permissions:
   contents: read
 
+env:
+  WV2_VERSION: '1.0.2903.40'
+
 jobs:
   build:
-    name: Windows portable exe
+    name: Windows exe (WebView2)
     runs-on: windows-latest
     defaults:
       run:
@@ -29,35 +32,49 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Fetch WebView2 SDK
+        shell: pwsh
+        run: |
+          $url = "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/$env:WV2_VERSION/microsoft.web.webview2.$env:WV2_VERSION.nupkg"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\wv2.nupkg"
+          Copy-Item "$env:RUNNER_TEMP\wv2.nupkg" "$env:RUNNER_TEMP\wv2.zip"
+          Expand-Archive "$env:RUNNER_TEMP\wv2.zip" -DestinationPath "$env:RUNNER_TEMP\wv2" -Force
+          Get-Item "$env:RUNNER_TEMP\wv2\build\native\x64\WebView2LoaderStatic.lib" | Select-Object Length
 
-      - name: Encrypt payload (AES-256-GCM)
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Encrypt payload
         run: node scripts/encrypt.js
 
-      - name: Build portable exe
-        run: npx electron-builder --win portable --publish never
-        env:
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-
-      - name: List output
-        run: Get-ChildItem dist -Recurse | Select-Object FullName,Length | Format-Table -AutoSize
-
-      - name: Verify asar contents
+      - name: Compile
+        shell: cmd
         run: |
-          npx --yes asar list dist/win-unpacked/resources/app.asar
-          Write-Host '--- 明文泄漏检查 ---'
-          # 只检查页面独有内容：main.js 里的窗口标题「机器人验证」不算泄漏
-          $hits = Select-String -Path dist/win-unpacked/resources/app.asar -Pattern 'verifyBox','0.30000000000000004','loadingBox' -SimpleMatch -ErrorAction SilentlyContinue
-          $html = Get-ChildItem dist/win-unpacked/resources -Recurse -Filter *.html -ErrorAction SilentlyContinue
-          if ($hits) { Write-Error 'asar 中出现明文页面片段'; exit 1 }
-          if ($html) { Write-Error ('asar 目录存在明文 HTML: ' + ($html.FullName -join ', ')); exit 1 }
-          Write-Host 'OK: asar 中无明文页面内容'
+          if not exist dist mkdir dist
+          cl /nologo /std:c++17 /EHsc /O1 /Os /MT /DUNICODE /D_UNICODE /DNDEBUG ^
+             /I "%RUNNER_TEMP%\wv2\build\native\include" ^
+             src\main.cpp ^
+             /link /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /INCREMENTAL:NO ^
+             /OUT:dist\VerifyDemo.exe ^
+             user32.lib gdi32.lib ole32.lib oleaut32.lib bcrypt.lib ^
+             "%RUNNER_TEMP%\wv2\build\native\x64\WebView2LoaderStatic.lib"
+
+      - name: Verify artifact
+        shell: pwsh
+        run: |
+          $exe = Get-Item dist\VerifyDemo.exe
+          "{0}  {1:N0} B  ({2:N1} KB)" -f $exe.Name, $exe.Length, ($exe.Length / 1KB)
+          if ($exe.Length -gt 3MB) { Write-Error "exe 超过 3MB：静态库或 CRT 被整包链入"; exit 1 }
+          Write-Host '--- 明文泄漏检查（应无命中）---'
+          $hits = Select-String -Path $exe.FullName -Pattern 'verifyBox','0.30000000000000004','loadingBox','我们怀疑你是人类' -SimpleMatch -ErrorAction SilentlyContinue
+          if ($hits) { Write-Error 'exe 中出现明文页面内容'; exit 1 } else { Write-Host 'OK: 无可读页面内容' }
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: verify-exe
-          path: verify-build/dist/*.exe
+          path: verify-build/dist/VerifyDemo.exe
           if-no-files-found: error
           retention-days: 7
