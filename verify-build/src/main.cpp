@@ -123,8 +123,11 @@ void InitWebView(HWND hwnd) {
                         if (FAILED(hr2) || !controller) return hr2;
                         g_controller = controller;
 
+                        ComPtr<ICoreWebView2> webview;
+                        controller->get_CoreWebView2(&webview);
+
                         ComPtr<ICoreWebView2Settings> settings;
-                        controller->get_Settings(&settings);
+                        if (webview) webview->get_Settings(&settings);
                         if (settings) {
                             settings->put_AreDevToolsEnabled(FALSE);
                             settings->put_AreDefaultContextMenusEnabled(FALSE);
@@ -136,8 +139,6 @@ void InitWebView(HWND hwnd) {
                             }
                         }
 
-                        ComPtr<ICoreWebView2> webview;
-                        controller->get_CoreWebView2(&webview);
                         if (webview) {
                             EventRegistrationToken token;
                             webview->add_NewWindowRequested(
