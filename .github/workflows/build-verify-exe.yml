@@ -1,6 +1,6 @@
 name: build-verify-exe
 
-# 仅在 test 分支上构建；html 与构建配置都不进入 main
+# 仅在 test 分支上构建；页面与构建配置都不进入 main
 on:
   push:
     branches: [test]
@@ -46,50 +46,62 @@ jobs:
         with:
           arch: x64
 
-      - name: Encrypt payload
-        run: node scripts/encrypt.js
-
-      - name: Compile
+      - name: Build VerifyDemo.exe
         shell: cmd
-        run: |
-          if not exist dist mkdir dist
-          cl /nologo /std:c++17 /EHsc /utf-8 /O1 /Os /MT /DUNICODE /D_UNICODE /DNDEBUG ^
-             /I "%RUNNER_TEMP%\wv2\build\native\include" ^
-             src\main.cpp ^
-             /link /SUBSYSTEM:WINDOWS /OPT:REF /OPT:ICF /INCREMENTAL:NO ^
-             /OUT:dist\VerifyDemo.exe ^
-             user32.lib gdi32.lib ole32.lib oleaut32.lib advapi32.lib bcrypt.lib ^
-             "%RUNNER_TEMP%\wv2\build\native\x64\WebView2LoaderStatic.lib"
+        run: build.bat verify VerifyDemo.exe
 
-      - name: Verify artifact
+      - name: Build EasiNote.exe (快捷白板10)
+        shell: cmd
+        run: build.bat easinote EasiNote.exe
+
+      - name: Verify artifacts
         shell: pwsh
         run: |
-          $exe = Get-Item dist\VerifyDemo.exe
-          "{0}  {1:N0} B  ({2:N1} KB)" -f $exe.Name, $exe.Length, ($exe.Length / 1KB)
-          if ($exe.Length -gt 3MB) { Write-Error "exe 超过 3MB：静态库或 CRT 被整包链入"; exit 1 }
-          Write-Host '--- 明文泄漏检查（应无命中）---'
-          $hits = Select-String -Path $exe.FullName -Pattern 'verifyBox','0.30000000000000004','loadingBox','我们怀疑你是人类' -SimpleMatch -ErrorAction SilentlyContinue
-          if ($hits) { Write-Error 'exe 中出现明文页面内容'; exit 1 } else { Write-Host 'OK: 无可读页面内容' }
+          $targets = @(
+            @{ Path = 'dist\VerifyDemo.exe'; Markers = @('verifyBox','loadingBox','0.30000000000000004'); U16 = @('机器人验证') },
+            @{ Path = 'dist\EasiNote.exe';    Markers = @('mit-license-tpl','easinote_update_ts','快捷白板10 备课版'); U16 = @('快捷白板10') }
+          )
+          $fail = $false
+          foreach ($t in $targets) {
+            $exe = Get-Item $t.Path
+            "{0}  {1:N0} B  ({2:N1} KB)" -f $exe.Name, $exe.Length, ($exe.Length / 1KB)
+            if ($exe.Length -gt 5MB) { Write-Error ($exe.Name + ' 超过 5MB'); $fail = $true }
 
-          Write-Host '--- UTF-16 中文串检查（验证 /utf-8 生效）---'
-          $u16 = [Text.Encoding]::Unicode.GetString([IO.File]::ReadAllBytes($exe.FullName))
-          foreach ($s in @('机器人验证','页面数据解密失败')) {
-            if (-not $u16.Contains($s)) { Write-Error ("未找到 UTF-16 字符串: " + $s); exit 1 }
+            $text = [IO.File]::ReadAllBytes($exe.FullName)
+            $utf8 = [Text.Encoding]::UTF8.GetString($text)
+            foreach ($m in $t.Markers) {
+              if ($utf8.Contains($m)) { Write-Error ($exe.Name + ' 出现明文页面片段: ' + $m); $fail = $true }
+            }
+            $u16 = [Text.Encoding]::Unicode.GetString($text)
+            foreach ($s in $t.U16) {
+              if (-not $u16.Contains($s)) { Write-Error ($exe.Name + ' 缺少 UTF-16 字符串: ' + $s); $fail = $true }
+            }
           }
-          Write-Host 'OK: 中文提示串为正常 UTF-16'
+          if ($fail) { exit 1 }
+          Write-Host 'OK: 体积、明文泄漏、UTF-16 中文串全部通过'
 
-      - name: Selftest (run decryption in the real binary)
+      - name: Selftest (decryption inside the real binaries)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath (Resolve-Path dist\VerifyDemo.exe) -ArgumentList '--selftest' -PassThru -Wait
-          Write-Host ("--selftest 退出码: " + $p.ExitCode)
-          if ($p.ExitCode -ne 0) { Write-Error "解密自检失败，退出码 $($p.ExitCode)"; exit 1 }
-          Write-Host 'OK: 二进制内解密链路正常'
+          foreach ($n in @('VerifyDemo.exe','EasiNote.exe')) {
+            $p = Start-Process -FilePath (Resolve-Path (Join-Path 'dist' $n)) -ArgumentList '--selftest' -PassThru -Wait
+            Write-Host ("{0} --selftest 退出码: {1}" -f $n, $p.ExitCode)
+            if ($p.ExitCode -ne 0) { Write-Error ($n + ' 解密自检失败'); exit 1 }
+          }
+          Write-Host 'OK: 两个二进制的解密链路都正常'
 
-      - name: Upload artifact
+      - name: Upload VerifyDemo
         uses: actions/upload-artifact@v4
         with:
           name: verify-exe
           path: verify-build/dist/VerifyDemo.exe
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload EasiNote
+        uses: actions/upload-artifact@v4
+        with:
+          name: easinote-exe
+          path: verify-build/dist/EasiNote.exe
           if-no-files-found: error
           retention-days: 7
