@@ -4930,21 +4930,36 @@ function getJSON(url, ms){
     });
 }
 function normalizeManifest(d){
-    if(!d || !(d.latest || d.tag_name)) return null;
+    if(!d) return null;
+    var assets = d.assets || {};
+    var latest = d.latest || d.tag_name || '';
+    /* 兼容只按格式声明版本、未写顶层 latest 的清单 */
+    if(!latest){
+        Object.keys(assets).forEach(function(k){
+            var v = assets[k] && assets[k].version;
+            if(v && cmpVersion(v, latest || '0') > 0) latest = v;
+        });
+    }
+    if(!latest) return null;
     return {
-        latest: String(d.latest || d.tag_name).replace(/^v/i, ''),
+        latest: String(latest).replace(/^v/i, ''),
         releaseUrl: d.release_url || d.html_url || UPDATE_FALLBACK_URL,
-        assets: d.assets || {}
+        assets: assets
     };
 }
 function manifestFromRelease(rel){
     var assets = {};
     (rel.assets || []).forEach(function(a){
         var n = String(a.name || '').toLowerCase();
-        var item = { url: a.browser_download_url, size: a.size };
+        var item = {
+            version: String(rel.tag_name || '').replace(/^v/i, ''),
+            url: a.browser_download_url,
+            size: a.size
+        };
         if(/\.html?$/.test(n)) assets.html = item;
         else if(/\.exe$/.test(n)) assets.exe = item;
         else if(/\.apk$/.test(n)) assets.apk = item;
+        else if(/\.ipa$/.test(n)) assets.ipa = item;
     });
     return { latest: rel.tag_name, releaseUrl: rel.html_url, assets: assets };
 }
@@ -4966,21 +4981,53 @@ function isPackagedApp(){
     try{ if(/EasiNote/i.test(navigator.userAgent)) return true; }catch(e){}
     return !!(window.AndroidBridge || window.ReactNativeWebView || window.EasiNoteApp);
 }
+
+/* 当前运行形态：决定读取清单里的哪个格式条目 */
+function currentFormat(){
+    var ua = '';
+    try{ ua = navigator.userAgent || ''; }catch(e){}
+    if(isPackagedApp()){
+        if(/Android/i.test(ua)) return 'apk';
+        if(/iPhone|iPad|iPod/i.test(ua)) return 'ipa';
+        return 'exe';
+    }
+    return 'html';
+}
+
+/* 解析当前形态对应的版本与下载地址；条目缺 version 时回退顶层 latest */
+function resolveUpdateTarget(m){
+    var fmt = currentFormat();
+    var assets = (m && m.assets) || {};
+    var item = assets[fmt] || null;
+    var version = (item && item.version) ? String(item.version).replace(/^v/i, '') : (m && m.latest);
+    return {
+        format: fmt,
+        version: version,
+        url: (item && item.url) || (m && m.releaseUrl) || UPDATE_FALLBACK_URL,
+        releaseUrl: (m && m.releaseUrl) || UPDATE_FALLBACK_URL
+    };
+}
+var UPDATE_FORMAT_LABEL = { html:'下载新版', exe:'下载安装包', apk:'下载 APK', ipa:'下载 IPA' };
+var UPDATE_FORMAT_NAME  = { html:'网页版', exe:'桌面版', apk:'Android 版', ipa:'iOS 版' };
+
+function escText(v){
+    return String(v == null ? '' : v).replace(/[&<>"]/g, function(c){
+        return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c];
+    });
+}
+
 function updateBannerHtml(u){
-    var assets = u.assets || {};
-    var pkg = isPackagedApp();
-    var hasHtml = !!(assets.html && assets.html.url);
-    var url = (!pkg && hasHtml) ? assets.html.url : u.releaseUrl;
-    var label = (!pkg && hasHtml) ? '下载新版' : '前往下载';
+    var label = UPDATE_FORMAT_LABEL[u.format] || '前往下载';
+    var kind = UPDATE_FORMAT_NAME[u.format] || '';
     return '<div class="update-banner" id="update-banner">' +
                 '<div class="ub-main">' +
                     '<i class="fas fa-arrow-circle-up"></i>' +
                     '<div class="ub-text">' +
-                        '<b>发现新版本 v' + u.latest + '</b>' +
-                        '<span>当前 v' + APP_VERSION + (pkg ? ' · 打包版请下载新版安装包' : '') + '</span>' +
+                        '<b>发现新版本 v' + escText(u.version) + (kind ? '（' + kind + '）' : '') + '</b>' +
+                        '<span>当前 v' + escText(APP_VERSION) + '</span>' +
                     '</div>' +
                 '</div>' +
-                '<button class="ub-btn" type="button" data-url="' + url + '">' + label + '</button>' +
+                '<button class="ub-btn" type="button" data-url="' + escText(u.url) + '">' + label + '</button>' +
             '</div>';
 }
 function mountUpdateBanner(ov){
@@ -5009,9 +5056,11 @@ function checkUpdate(){
     var skipped = '';
     try{ skipped = localStorage.getItem('easinote_skip_version') || ''; }catch(e){}
     loadManifest(0).then(function(m){
-        if(!m || cmpVersion(m.latest, APP_VERSION) <= 0) return;
-        if(skipped && cmpVersion(m.latest, skipped) <= 0) return;
-        PENDING_UPDATE = m;
+        if(!m) return;
+        var t = resolveUpdateTarget(m);
+        if(!t.version || cmpVersion(t.version, APP_VERSION) <= 0) return;
+        if(skipped && cmpVersion(t.version, skipped) <= 0) return;
+        PENDING_UPDATE = t;
         var ov = document.querySelector('.modal-overlay');
         if(ov) mountUpdateBanner(ov);
     }).catch(function(){ /* 静默：离线、限流、被墙都不打扰用户 */ });
