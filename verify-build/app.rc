@@ -1,7 +1,7 @@
 #include <windows.h>
 
-/* 应用图标：IDI_APP = 101，与 src/main.cpp 中的 IDI_APP 保持一致 */
+/* App icon: IDI_APP = 101 (must match src/main.cpp) */
 101 ICON "res\\app.ico"
 
-/* 清单必须是资源 ID 1（RT_MANIFEST），用于 PerMonitorV2 DPI 感知 */
+/* Manifest must be resource ID 1 (RT_MANIFEST); declares PerMonitorV2 DPI awareness */
 1 RT_MANIFEST "res\\app.manifest"
