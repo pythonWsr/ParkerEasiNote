@@ -285,8 +285,10 @@ void InitWebView(HWND hwnd) {
                                     return S_OK;
                                 }).Get(), &tok);
 
-                        /* 导出/下载：直接落到 下载 目录，不弹对话框 */
-                        webview->add_DownloadStarting(
+                        /* 导出/下载：直接落到 下载 目录，不弹对话框
+                           DownloadStarting 属于 ICoreWebView2_4，需要 QI */
+                        ComPtr<ICoreWebView2_4> webview4;
+                        if (SUCCEEDED(webview.As(&webview4))) webview4->add_DownloadStarting(
                             Callback<ICoreWebView2DownloadStartingEventHandler>(
                                 [](ICoreWebView2*, ICoreWebView2DownloadStartingEventArgs* args) -> HRESULT {
                                     ComPtr<ICoreWebView2DownloadOperation> op;
