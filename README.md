@@ -180,10 +180,13 @@ API Key 保存在 `localStorage`，不会上传至任何第三方。
 ## 📦 `.pnbx` 课件格式
 
 `.pnbx` 是一个标准 ZIP 包，内部结构如下：
+
+```
 course.xml              # 课件描述：画布尺寸、标题、页面清单
 pages/page1.xml         # 第 1 页：元素 + 批注笔迹
 pages/page2.xml
 src/img_1.png           # 引用的图片资源
+```
 
 `course.xml` 示例：
 
@@ -193,52 +196,58 @@ src/img_1.png           # 引用的图片资源
   <page file="pages/page2.xml" index="2" name="第 2 页"/>
 </course>
 ```
+
 因为基于 ZIP + XML，第三方工具也能读取和生成。
-技术栈
 
-· 原生 JavaScript（无框架、无构建步骤）
-· Canvas 2D（绘图核心，含静态层缓存与变宽笔迹）
-· Pointer Events（统一鼠标 / 触控笔 / 触屏，支持合并采样）
-· ZipKit（封装层，优先 JSZip，缺失时用内置 MiniZip）
-· DOMParser（PPTX / DOCX / pnbx 的 XML 解析）
-· PDF.js（PDF 导入）
-· Font Awesome 6（图标）
-· DeepSeek API（AI 总结与对话）
-· CSS Backdrop Filter / conic-gradient（毛玻璃与彩光特效，带降级）
-浏览器 支持情况
-Chrome 90+ ✅ 完整支持
-Edge 90+ ✅ 
+## 技术栈
 
-注意：
+- 原生 JavaScript（无框架、无构建步骤）
+- Canvas 2D（绘图核心，含静态层缓存与变宽笔迹）
+- Pointer Events（统一鼠标 / 触控笔 / 触屏，支持合并采样）
+- ZipKit（封装层，优先 JSZip，缺失时用内置 MiniZip）
+- DOMParser（PPTX / DOCX / pnbx 的 XML 解析）
+- PDF.js（PDF 导入）
+- Font Awesome 6（图标）
+- DeepSeek API（AI 总结与对话）
+- CSS Backdrop Filter / conic-gradient（毛玻璃与彩光特效，带降级）
 
-· 视频展台在 Android WebView 中需要宿主 App 声明 CAMERA 权限并实现 WebChromeClient.onPermissionRequest 授权
-· 老内核不支持 DecompressionStream 时，内置 MiniZip 只能处理「不压缩」的 ZIP；建议保留 src/jszip.min.js
-· 退出登录会尝试调用宿主桥接，可在 callNativeExit() 中补充你自己的桥名
+## 浏览器 支持情况
 
-⚠️ 已知限制
+- Chrome 90+ ✅ 完整支持
+- Edge 90+ ✅
 
-· PPT / Word 均为纯前端解析，复杂动画、SmartArt、图表、嵌入视频、公式无法完整还原
-· .ppt / .doc 旧格式不支持，请先另存为 .pptx / .docx
-· Word 分页为启发式估算，与 Office 实际分页可能有细微差异
-· AI 功能需要网络连接
-· 保存数据存于浏览器 localStorage，清理浏览器数据会丢失
-· 视频展台在部分 WebView 中需要原生层配合授权
+**注意：**
 
+- 视频展台在 Android WebView 中需要宿主 App 声明 CAMERA 权限并实现 WebChromeClient.onPermissionRequest 授权
+- 老内核不支持 DecompressionStream 时，内置 MiniZip 只能处理「不压缩」的 ZIP；建议保留 src/jszip.min.js
+- 退出登录会尝试调用宿主桥接，可在 callNativeExit() 中补充你自己的桥名
+
+## ⚠️ 已知限制
+
+- PPT / Word 均为纯前端解析，复杂动画、SmartArt、图表、嵌入视频、公式无法完整还原
+- .ppt / .doc 旧格式不支持，请先另存为 .pptx / .docx
+- Word 分页为启发式估算，与 Office 实际分页可能有细微差异
+- AI 功能需要网络连接
+- 保存数据存于浏览器 localStorage，清理浏览器数据会丢失
+- 视频展台在部分 WebView 中需要原生层配合授权
+
+```
 快捷白板10.html       主程序（单文件，包含全部样式与逻辑）
 src/jszip.min.js      ZIP 依赖（可选，缺失时用内置 MiniZip）
 src/easinote.png      更新弹窗图标（可选）
 LICENSE               MIT 开源协议
 README.md             本文档
+```
 
-反馈与交流
+## 反馈与交流
 
-· 交流群：1129349388
-· 作者：ParkerStudio
-· 官网：
+- 交流群：1129349388
+- 作者：ParkerStudio
+- 官网：
 
 有任何问题或建议欢迎反馈。
 
-开源协议
+## 开源协议
 
 本项目基于 MIT License 开源，详见 LICENSE。
 
@@ -248,12 +257,12 @@ Copyright (c) 2026 ParkerStudio
 
 你可以自由使用、修改、分发本项目，包括商业用途，只需保留版权声明。
 
-致谢
+## 致谢
 
-· JSZip — ZIP 读写
-· PDF.js — PDF 渲染
-· Font Awesome — 图标
-· DeepSeek — AI 能力
-· NOBOOK — 虚拟实验
-· 感谢所有为项目提供反馈和建议的用户
+- JSZip — ZIP 读写
+- PDF.js — PDF 渲染
+- Font Awesome — 图标
+- DeepSeek — AI 能力
+- NOBOOK — 虚拟实验
+- 感谢所有为项目提供反馈和建议的用户
 
