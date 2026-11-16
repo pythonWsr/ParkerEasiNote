@@ -1,9 +1,8 @@
 # 代码所有者（CODEOWNERS）
 #
-# 作用：为本仓库后续启用 Pull Request 评审做准备。
-#   1. 在 GitHub 仓库 Settings → Code and automation → Branches 中，
-#      为 main 添加分支保护规则，并勾选 “Require review from Code Owners”；
-#   2. 之后任何 PR 只要触碰到下列路径，都会自动请求对应 owner 评审。
+# 作用：main 已启用「必须走 PR + 需要代码所有者评审」的规则集。
+# 任何 PR 只要触碰到下列路径，都会自动请求对应 owner 评审；
+# 仓库所有者（@pythonWsr）在规则集中配置了 bypass，可直接推送。
 #
 # 语法：<匹配路径> <owner>，文件末尾的规则优先级最高。
 # GitHub 会从分支的 .github/CODEOWNERS、根目录 CODEOWNERS、docs/CODEOWNERS
@@ -11,6 +10,9 @@
 
 # 默认：仓库内所有文件由维护者评审
 * @pythonWsr
+
+# 主程序
+/快捷白板10.html @pythonWsr
 
 # 代码所有者配置本身：防止被绕过
 /.github/CODEOWNERS @pythonWsr
