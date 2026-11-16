@@ -1,0 +1,65 @@
+name: build-apk
+
+# 仅在 test 分支构建；页面与移动端配置都不进入 main
+on:
+  push:
+    branches: [test]
+    paths:
+      - 'mobile-build/android/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Android APK (WebView shell)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Ensure Android SDK components
+        run: |
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+          echo "SDK=$SDK"
+          ls "$SDK/build-tools" 2>/dev/null || true
+          if [ ! -d "$SDK/build-tools/34.0.0" ] || [ ! -d "$SDK/platforms/android-34" ]; then
+            SM="$SDK/cmdline-tools/latest/bin/sdkmanager"
+            [ -x "$SM" ] || SM=$(find "$SDK" -name sdkmanager -type f 2>/dev/null | head -1)
+            echo "using sdkmanager: $SM"
+            yes | "$SM" --licenses > /dev/null 2>&1 || true
+            "$SM" "build-tools;34.0.0" "platforms;android-34"
+          fi
+
+      - name: Build APK
+        run: bash mobile-build/android/build.sh
+
+      - name: Verify APK
+        run: |
+          set -e
+          APK=mobile-build/android/out/EasiNote.apk
+          SIZE=$(stat -c%s "$APK")
+          echo "APK: $APK  ${SIZE} B ($((SIZE/1024)) KB)"
+          if [ "$SIZE" -gt 3145728 ]; then echo "APK 超过 3MB"; exit 1; fi
+          unzip -l "$APK" | grep -E 'classes\.dex|assets/index\.html|resources\.arsc'
+          unzip -p "$APK" assets/index.html | head -c 64
+          echo
+          unzip -p "$APK" assets/index.html | grep -q 'mit-license-tpl' && echo "OK: 页面内容已打入 assets"
+          echo "OK: APK 结构正常"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: easinote-apk
+          path: mobile-build/android/out/EasiNote.apk
+          if-no-files-found: error
+          retention-days: 7

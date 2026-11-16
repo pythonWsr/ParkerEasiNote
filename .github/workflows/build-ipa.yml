@@ -1,0 +1,50 @@
+name: build-ipa
+
+# 仅在 test 分支构建；未签名 ipa，仅用于结构验证与后续重签
+on:
+  push:
+    branches: [test]
+    paths:
+      - 'mobile-build/ios/**'
+      - '.github/workflows/build-ipa.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: iOS IPA (unsigned, WKWebView shell)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Build unsigned IPA
+        run: bash mobile-build/ios/build.sh
+
+      - name: Verify IPA
+        run: |
+          set -e
+          IPA=mobile-build/ios/build/EasiNote.ipa
+          SIZE=$(stat -f%z "$IPA")
+          echo "IPA: $IPA  ${SIZE} B ($((SIZE/1024)) KB)"
+          if [ "$SIZE" -gt 3145728 ]; then echo "IPA 超过 3MB"; exit 1; fi
+          unzip -l "$IPA" | grep -E 'Payload/EasiNote\.app/(EasiNote|Info\.plist|index\.html)'
+          file mobile-build/ios/build/EasiNote.app/EasiNote
+          plutil -lint mobile-build/ios/build/EasiNote.app/Info.plist
+          echo "OK: IPA 结构正常（未签名）"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: easinote-ipa
+          path: mobile-build/ios/build/EasiNote.ipa
+          if-no-files-found: error
+          retention-days: 7
