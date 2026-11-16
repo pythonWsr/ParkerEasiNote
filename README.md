@@ -192,6 +192,7 @@ src/img_1.png           # 引用的图片资源
   <page file="pages/page1.xml" index="1" name="第 1 页"/>
   <page file="pages/page2.xml" index="2" name="第 2 页"/>
 </course>
+```
 因为基于 ZIP + XML，第三方工具也能读取和生成。
 技术栈
 
