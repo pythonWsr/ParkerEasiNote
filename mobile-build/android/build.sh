@@ -58,8 +58,9 @@ cp "$OUT/dex/classes.dex" "$OUT/classes.dex"
 # 若以后要上架或做正式签名，改用 GitHub Secrets 注入正式 keystore。
 KEYSTORE="$HERE/easinote-debug.jks"
 [ -f "$KEYSTORE" ] || { echo "[apk] 缺少固定签名文件: $KEYSTORE" >&2; exit 1; }
-"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:easinote --key-pass pass:easinote \
-    --alias easinote --out "$OUT/EasiNote.apk" "$OUT/aligned.apk"
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-key-alias easinote \
+    --ks-pass pass:easinote --key-pass pass:easinote \
+    --out "$OUT/EasiNote.apk" "$OUT/aligned.apk"
 "$BT/apksigner" verify --verbose "$OUT/EasiNote.apk" | head -5
 "$BT/apksigner" verify --print-certs "$OUT/EasiNote.apk" | grep -i "SHA-256" || true
 
