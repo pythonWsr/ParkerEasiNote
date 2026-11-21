@@ -9,8 +9,8 @@ BUILD="$HERE/build"
 APP="$BUILD/EasiNote.app"
 STAGE="$BUILD/dmg"
 
-echo "[dmg] 页面：$REPO/快捷白板10.html"
-[ -f "$REPO/快捷白板10.html" ] || { echo "[dmg] 缺少 快捷白板10.html，请先跑 tools/bundle_html.py" >&2; exit 1; }
+echo "[dmg] 页面：$REPO/web/（多文件，原样打包）"
+[ -f "$REPO/web/index.html" ] || { echo "[dmg] 缺少 web/index.html" >&2; exit 1; }
 
 rm -rf "$BUILD"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -27,7 +27,8 @@ strip -x "$APP/Contents/MacOS/EasiNote" 2>/dev/null || true
 
 # 2) 组装 .app
 cp "$HERE/Info.plist" "$APP/Contents/Info.plist"
-cp "$REPO/快捷白板10.html" "$APP/Contents/Resources/index.html"
+mkdir -p "$APP/Contents/Resources/www"
+cp -R "$REPO/web/." "$APP/Contents/Resources/www/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
 # 3) 图标：从页面自带的 logo.png 生成 .icns（失败不影响构建）

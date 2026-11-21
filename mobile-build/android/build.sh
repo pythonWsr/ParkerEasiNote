@@ -43,11 +43,12 @@ javac -source 8 -target 8 -nowarn -encoding UTF-8 \
 find "$OUT/classes" -name '*.class' > "$OUT/classlist.txt"
 "$BT/d8" --lib "$JAR" --min-api 21 --release --output "$OUT/dex" @"$OUT/classlist.txt"
 
-# 4) 组装：资源 APK + classes.dex + assets/index.html
+# 4) 组装：资源 APK + classes.dex + assets/www（多文件页面，原样打包 web/）
 cp "$OUT/base.apk" "$OUT/app.apk"
-cp "$REPO/快捷白板10.html" "$OUT/assets/index.html"
+mkdir -p "$OUT/assets/www"
+cp -R "$REPO/web/." "$OUT/assets/www/"
 cp "$OUT/dex/classes.dex" "$OUT/classes.dex"
-( cd "$OUT" && zip -q app.apk classes.dex assets/index.html )
+( cd "$OUT" && zip -q -r app.apk classes.dex assets )
 
 # 5) 对齐 + 签名（调试密钥，仅用于测试安装）
 ( cd "$OUT" && "$BT/zipalign" -f 4 app.apk aligned.apk )

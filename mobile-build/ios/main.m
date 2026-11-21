@@ -25,7 +25,7 @@
     self.web.scrollView.bounces = NO;
     [self.view addSubview:self.web];
 
-    NSString *path = [[NSBundle mainBundle] pathForResource:@"index" ofType:@"html"];
+    NSString *path = [[NSBundle mainBundle] pathForResource:@"index" ofType:@"html" inDirectory:@"www"];
     if (path) {
         NSURL *url = [NSURL fileURLWithPath:path];
         [self.web loadFileURL:url allowingReadAccessToURL:[url URLByDeletingLastPathComponent]];

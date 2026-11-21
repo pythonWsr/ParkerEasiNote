@@ -1,13 +1,12 @@
 name: build-ipa
 
-# 仅在 test 分支构建；未签名 ipa，仅用于结构验证与后续重签
+# 仅在 test 分支构建；直接打包 web/ 多文件目录；未签名 ipa，仅用于结构验证与后续重签
 on:
   push:
     branches: [test]
     paths:
       - 'mobile-build/ios/**'
       - 'web/**'
-      - 'tools/bundle_html.py'
       - '.github/workflows/build-ipa.yml'
   workflow_dispatch:
 
@@ -23,8 +22,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Bundle single-file HTML
-        run: python3 tools/bundle_html.py --out 快捷白板10.html
+      - name: Read version
+        id: ver
+        run: |
+          V=$(python3 -c "import json;print(json.load(open('web/version.json',encoding='utf-8'))['version'])")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "web version: $V"
 
       - name: Show toolchain
         run: |
@@ -34,24 +37,34 @@ jobs:
       - name: Build unsigned IPA
         run: bash mobile-build/ios/build.sh
 
-      - name: Verify IPA
+      - name: Package artifact
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -e
-          IPA=mobile-build/ios/build/EasiNote.ipa
+          mkdir -p dist
+          cp mobile-build/ios/build/EasiNote.ipa "dist/ParkerEasiNote-${VERSION}.ipa"
+
+      - name: Verify IPA
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -e
+          IPA="dist/ParkerEasiNote-${VERSION}.ipa"
           SIZE=$(stat -f%z "$IPA")
           echo "IPA: $IPA  ${SIZE} B ($((SIZE/1024)) KB)"
           echo "::notice title=IPA 体积::${SIZE} B ($((SIZE/1024)) KB)"
-          unzip -l "$IPA" | grep -E 'Payload/EasiNote\.app/(EasiNote|Info\.plist|index\.html)'
+          unzip -l "$IPA" | grep -E 'Payload/EasiNote\.app/(EasiNote|Info\.plist|www/index\.html|www/js/app\.js|www/vendor/)'
           file mobile-build/ios/build/EasiNote.app/EasiNote
           plutil -lint mobile-build/ios/build/EasiNote.app/Info.plist
-          unzip -p "$IPA" Payload/EasiNote.app/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 页面内容已打入 index.html"
-          unzip -p "$IPA" Payload/EasiNote.app/index.html | grep -q 'EN10_HANZI' && echo "OK: 离线资源已内联"
-          echo "OK: IPA 结构正常（未签名）"
+          unzip -p "$IPA" Payload/EasiNote.app/www/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 多文件页面已打入 www"
+          unzip -p "$IPA" Payload/EasiNote.app/www/index.html | grep -q 'css/tokens.css' && echo "OK: 子资源引用保留（未内联）"
+          echo "OK: IPA 结构正常（未签名，多文件形式）"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: easinote-ipa
-          path: mobile-build/ios/build/EasiNote.ipa
+          name: ParkerEasiNote-${{ steps.ver.outputs.version }}-ipa
+          path: dist/ParkerEasiNote-${{ steps.ver.outputs.version }}.ipa
           if-no-files-found: error
           retention-days: 7

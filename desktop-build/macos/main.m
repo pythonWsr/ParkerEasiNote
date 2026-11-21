@@ -63,7 +63,7 @@
     [self.webView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
     [self.window setContentView:self.webView];
 
-    NSString *path = [[NSBundle mainBundle] pathForResource:@"index" ofType:@"html"];
+    NSString *path = [[NSBundle mainBundle] pathForResource:@"index" ofType:@"html" inDirectory:@"www"];
     if (path == nil) {
         NSLog(@"[EN10] 找不到 index.html");
         [NSApp terminate:nil];

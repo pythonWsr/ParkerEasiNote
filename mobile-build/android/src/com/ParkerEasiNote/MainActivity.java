@@ -38,7 +38,7 @@ public class MainActivity extends Activity {
         web.setBackgroundColor(0xFF0F261E);
         setContentView(web);
 
-        web.loadUrl("file:///android_asset/index.html");
+        web.loadUrl("file:///android_asset/www/index.html");
     }
 
     @Override

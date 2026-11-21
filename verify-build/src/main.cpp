@@ -1,11 +1,10 @@
-// 单文件 EXE 宿主：Win32 + WebView2（无 Electron），页面以 AES-256-CBC 密文内嵌。
+// 多文件 EXE 宿主：Win32 + WebView2（无 Electron），整个 web/ 目录以 AES-256-CBC 密文内嵌。
 //
-// 同一份宿主可打包两种产品：
-//   - 默认（无宏）          ：《人机验证》演示页，标题「机器人验证」
-//   - /DPRODUCT_EASINOTE    ：快捷白板10，标题「快捷白板10」
+// 打包方式：scripts/encrypt.js 把 web/ 打成自描述容器（EN10WEB/1），再加密成
+// payload_data.h；运行时解密到内存，拦截 https://app.easinote.local/* 的请求，
+// 按路径返回对应文件（index.html / css / js / vendor / data / assets）。
 //
-// 装载方式：拦截 https://app.easinote.local/* 的请求，从内存返回解密后的 HTML，
-// 这样页面运行在正常的 https 源上，localStorage / IndexedDB / 定时器等都能用
+// 这样页面运行在正常的 https 源上，localStorage / IndexedDB / 定时器 / Worker 都能用
 // （对比 NavigateToString 的不透明源，localStorage 会直接抛异常）。
 //
 // 加密方案与 scripts/encrypt.js 一致：PBKDF2-HMAC-SHA256(100000) → AES-256-CBC。
@@ -66,7 +65,17 @@ void EnableDpiAwareness() {
 }
 
 ComPtr<ICoreWebView2Controller> g_controller;
-std::string g_html;      /* 解密后的页面（UTF-8），仅存在内存 */
+
+/* 解密后的容器（EN10WEB/1），仅存在内存 */
+std::string g_blob;
+
+struct WebFile {
+    std::string path;    /* 相对 web/ 的路径，例如 css/app.css */
+    std::string mime;
+    size_t off;
+    size_t size;
+};
+std::vector<WebFile> g_files;
 bool g_fullscreen = false;
 LONG_PTR g_savedStyle = 0;
 WINDOWPLACEMENT g_savedPlacement = {sizeof(WINDOWPLACEMENT)};
@@ -122,6 +131,77 @@ std::string DecryptPayload() {
 
     out.resize(outLen);
     return std::string(out.begin(), out.end());
+}
+
+/* 解析解密后的容器：
+     EN10WEB/1\n
+     <文件数>\n
+     <mime>\t<size>\t<path>\n  × 文件数
+     \n
+     <文件字节，按上面的顺序依次拼接>           */
+bool ParseContainer() {
+    const std::string magic = "EN10WEB/1\n";
+    if (g_blob.size() < magic.size()) return false;
+    if (g_blob.compare(0, magic.size(), magic) != 0) return false;
+
+    size_t pos = magic.size();
+    size_t nl = g_blob.find('\n', pos);
+    if (nl == std::string::npos) return false;
+    int count = std::atoi(g_blob.substr(pos, nl - pos).c_str());
+    if (count <= 0 || count > 200000) return false;
+    pos = nl + 1;
+
+    std::vector<WebFile> files;
+    files.reserve(static_cast<size_t>(count));
+    for (int i = 0; i < count; ++i) {
+        nl = g_blob.find('\n', pos);
+        if (nl == std::string::npos) return false;
+        const std::string line = g_blob.substr(pos, nl - pos);
+        const size_t t1 = line.find('\t');
+        const size_t t2 = (t1 == std::string::npos) ? std::string::npos : line.find('\t', t1 + 1);
+        if (t1 == std::string::npos || t2 == std::string::npos) return false;
+        WebFile f;
+        f.mime = line.substr(0, t1);
+        f.size = static_cast<size_t>(std::stoull(line.substr(t1 + 1, t2 - t1 - 1)));
+        f.path = line.substr(t2 + 1);
+        f.off = 0;
+        files.push_back(f);
+        pos = nl + 1;
+    }
+    if (pos >= g_blob.size() || g_blob[pos] != '\n') return false;
+    ++pos;
+
+    size_t cur = pos;
+    for (auto& f : files) {
+        f.off = cur;
+        cur += f.size;
+        if (cur > g_blob.size()) return false;
+    }
+
+    g_files.swap(files);
+    return true;
+}
+
+/* 从请求 URI 里取相对路径：https://app.easinote.local/a/b.css?x → a/b.css */
+std::string RequestPath(const std::string& uri) {
+    std::string rest = uri;
+    const size_t scheme = rest.find("://");
+    if (scheme != std::string::npos) {
+        const size_t slash = rest.find('/', scheme + 3);
+        rest = (slash == std::string::npos) ? std::string() : rest.substr(slash);
+    }
+    const size_t q = rest.find_first_of("?#");
+    if (q != std::string::npos) rest.resize(q);
+    while (!rest.empty() && rest.front() == '/') rest.erase(rest.begin());
+    if (rest.empty()) rest = "index.html";
+    return rest;
+}
+
+const WebFile* FindFile(const std::string& rel) {
+    for (const auto& f : g_files) {
+        if (f.path == rel) return &f;
+    }
+    return nullptr;
 }
 
 std::wstring GetModuleDir() {
@@ -183,22 +263,37 @@ void ServeRequest(ICoreWebView2Environment* env, ICoreWebView2WebResourceRequest
     std::wstring uri = uriRaw ? uriRaw : L"";
     CoTaskMemFree(uriRaw);
 
+    /* 宽字符 URI → UTF-8 相对路径 */
+    std::string rel;
+    if (!uri.empty()) {
+        const int need = WideCharToMultiByte(CP_UTF8, 0, uri.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (need > 1) {
+            std::string buf(static_cast<size_t>(need - 1), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, uri.c_str(), -1, &buf[0], need, nullptr, nullptr);
+            rel = RequestPath(buf);
+        }
+    }
+    if (rel.empty()) rel = "index.html";
+
+    const WebFile* file = FindFile(rel);
+
     ComPtr<ICoreWebView2WebResourceResponse> response;
-    const bool isIndex = (uri == kOrigin) || (uri == kStartUrl);
-    if (isIndex) {
-        IStream* stream = SHCreateMemStream(reinterpret_cast<const BYTE*>(g_html.data()),
-                                            static_cast<UINT>(g_html.size()));
+    if (file != nullptr) {
+        IStream* stream = SHCreateMemStream(
+            reinterpret_cast<const BYTE*>(g_blob.data() + file->off),
+            static_cast<UINT>(file->size));
         env->CreateWebResourceResponse(stream, 200, L"OK", nullptr, &response);
         if (stream) stream->Release();
         if (response) {
             ComPtr<ICoreWebView2HttpResponseHeaders> headers;
             if (SUCCEEDED(response->get_Headers(&headers)) && headers) {
-                headers->AppendHeader(L"Content-Type", L"text/html; charset=utf-8");
+                const std::wstring mime(file->mime.begin(), file->mime.end());
+                headers->AppendHeader(L"Content-Type", mime.c_str());
                 headers->AppendHeader(L"Cache-Control", L"no-store");
             }
         }
     } else {
-        /* 其余路径（src/*、DELETEME.md 等）一律 404，不触网 */
+        /* 未打包的路径（含外链）一律 404，不触网 */
         env->CreateWebResourceResponse(nullptr, 404, L"Not Found", nullptr, &response);
     }
     args->put_Response(response.Get());
@@ -365,18 +460,19 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int) {
     /* 自检模式：只跑解密链路，不建窗口。返回 0 = 成功，2 = 失败。 */
     if (wcsstr(GetCommandLineW(), L"--selftest") != nullptr) {
-        std::string probe = DecryptPayload();
-        const bool ok = probe.size() > 64 && probe.find("<!DOCTYPE") != std::string::npos;
-        if (!probe.empty()) SecureZeroMemory(&probe[0], probe.size());
+        g_blob = DecryptPayload();
+        const bool ok = !g_blob.empty() && ParseContainer() &&
+                        FindFile("index.html") != nullptr && FindFile("js/app.js") != nullptr;
+        if (!g_blob.empty()) SecureZeroMemory(&g_blob[0], g_blob.size());
         return ok ? 0 : 2;
     }
 
     EnableDpiAwareness();
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
-    g_html = DecryptPayload();
-    if (g_html.empty()) {
-        MessageBoxW(nullptr, L"页面数据解密失败。", L"启动失败", MB_ICONERROR | MB_OK);
+    g_blob = DecryptPayload();
+    if (g_blob.empty() || !ParseContainer()) {
+        MessageBoxW(nullptr, L"页面数据解密失败或容器损坏。", L"启动失败", MB_ICONERROR | MB_OK);
         return 1;
     }
 
@@ -408,7 +504,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, LPWSTR, int) {
     }
 
     g_controller.Reset();
-    g_html.clear();
+    g_blob.clear();
+    g_files.clear();
     CoUninitialize();
     return 0;
 }

@@ -1,6 +1,6 @@
 name: build-html
 
-# 仅 test 分支：把 web/ 下的多文件应用打包成一个完全离线的单文件 HTML
+# 仅 test 分支：把 web/ 多文件应用打包成一个完全离线的单文件 HTML（可选产物）
 on:
   push:
     branches: [test]
@@ -22,18 +22,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show source version
+      - name: Read version
+        id: ver
         run: |
-          echo "web/version.json:"
-          cat web/version.json
+          V=$(python3 -c "import json;print(json.load(open('web/version.json',encoding='utf-8'))['version'])")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "web version: $V"
 
       - name: Bundle
-        run: python3 tools/bundle_html.py --out dist/快捷白板10.html
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: python3 tools/bundle_html.py --out "dist/ParkerEasiNote-${VERSION}.html"
 
       - name: Verify single-file HTML
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -e
-          F=dist/快捷白板10.html
+          F="dist/ParkerEasiNote-${VERSION}.html"
           SIZE=$(stat -c%s "$F")
           echo "HTML: $F  ${SIZE} B ($((SIZE/1024)) KB)"
           echo "::notice title=单文件 HTML 体积::${SIZE} B ($((SIZE/1024)) KB)"
@@ -59,7 +65,7 @@ jobs:
       - name: Upload HTML
         uses: actions/upload-artifact@v4
         with:
-          name: easinote-html
-          path: dist/快捷白板10.html
+          name: ParkerEasiNote-${{ steps.ver.outputs.version }}-html
+          path: dist/ParkerEasiNote-${{ steps.ver.outputs.version }}.html
           if-no-files-found: error
           retention-days: 7

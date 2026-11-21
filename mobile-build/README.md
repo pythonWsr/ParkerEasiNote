@@ -1,14 +1,12 @@
 # mobile-build（test 分支专用）
 
-把单文件 `快捷白板10.html` 打成 **Android APK** 与 **iOS IPA**（macOS 的 DMG 在
-`desktop-build/macos/`），同样走轻量化路线：不用 AndroidX、不用 CocoaPods、
-不引第三方框架，只保留系统 WebView。
+把 `web/` **多文件目录**直接打成 **Android APK** 与 **iOS IPA**（macOS 的 DMG 在
+`desktop-build/macos/`、Windows 的 exe 在 `verify-build/`），同样走轻量化路线：
+不用 AndroidX、不用 CocoaPods、不引第三方框架，只保留系统 WebView。
 
-单文件页面由 `web/` 源码生成，构建前先跑：
-
-```bash
-python3 tools/bundle_html.py --out 快捷白板10.html
-```
+打包方式：整个 `web/` 目录原样放进壳里（APK 的 `assets/www/`、IPA 的
+`EasiNote.app/www/`、DMG 的 `Contents/Resources/www/`、EXE 的加密容器），
+不再先生成单文件 HTML。单文件 HTML 只作为独立的可选产物（`build-html.yml`）。
 
 | 产物 | 壳 | 构建机 | 说明 |
 |---|---|---|---|

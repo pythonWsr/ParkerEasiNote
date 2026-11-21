@@ -1,13 +1,12 @@
 name: build-apk
 
-# 仅在 test 分支构建；页面与移动端配置都不进入 main
+# 仅在 test 分支构建；直接打包 web/ 多文件目录（不再先生成单文件 HTML）
 on:
   push:
     branches: [test]
     paths:
       - 'mobile-build/android/**'
       - 'web/**'
-      - 'tools/bundle_html.py'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -23,8 +22,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Bundle single-file HTML
-        run: python3 tools/bundle_html.py --out 快捷白板10.html
+      - name: Read version
+        id: ver
+        run: |
+          V=$(python3 -c "import json;print(json.load(open('web/version.json',encoding='utf-8'))['version'])")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "web version: $V"
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -48,10 +51,20 @@ jobs:
       - name: Build APK
         run: bash mobile-build/android/build.sh
 
-      - name: Verify APK
+      - name: Package artifact
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -e
-          APK=mobile-build/android/out/EasiNote.apk
+          mkdir -p dist
+          cp mobile-build/android/out/EasiNote.apk "dist/ParkerEasiNote-${VERSION}.apk"
+
+      - name: Verify APK
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -e
+          APK="dist/ParkerEasiNote-${VERSION}.apk"
           SIZE=$(stat -c%s "$APK")
           echo "APK: $APK  ${SIZE} B ($((SIZE/1024)) KB)"
           echo "::notice title=APK 体积::${SIZE} B ($((SIZE/1024)) KB)"
@@ -63,17 +76,17 @@ jobs:
             echo "包名不是 com.ParkerEasiNote"; exit 1;
           }
 
-          unzip -l "$APK" | grep -E 'classes\.dex|assets/index\.html|resources\.arsc'
-          unzip -p "$APK" assets/index.html | head -c 64
+          unzip -l "$APK" | grep -E 'classes\.dex|assets/www/index\.html|assets/www/js/app\.js|assets/www/vendor/|resources\.arsc'
+          unzip -p "$APK" assets/www/index.html | head -c 64
           echo
-          unzip -p "$APK" assets/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 页面内容已打入 assets"
-          unzip -p "$APK" assets/index.html | grep -q 'EN10_HANZI' && echo "OK: 离线资源已内联"
-          echo "OK: APK 结构正常（包名 com.ParkerEasiNote）"
+          unzip -p "$APK" assets/www/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 多文件页面已打入 assets/www"
+          unzip -p "$APK" assets/www/index.html | grep -q 'css/tokens.css' && echo "OK: 子资源引用保留（未内联）"
+          echo "OK: APK 结构正常（包名 com.ParkerEasiNote，多文件形式）"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: easinote-apk
-          path: mobile-build/android/out/EasiNote.apk
+          name: ParkerEasiNote-${{ steps.ver.outputs.version }}-apk
+          path: dist/ParkerEasiNote-${{ steps.ver.outputs.version }}.apk
           if-no-files-found: error
           retention-days: 7

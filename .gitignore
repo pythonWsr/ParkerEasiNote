@@ -16,4 +16,5 @@ Thumbs.db
 
 # 本地构建输出目录（打包产物不进入仓库）
 /out/
+/dist/
 mobile-build/android/out/

@@ -1,13 +1,12 @@
 name: build-dmg
 
-# 仅在 test 分支构建；未签名 dmg（AppKit + WKWebView 壳），产物只上传 artifact
+# 仅在 test 分支构建；直接打包 web/ 多文件目录；未签名 dmg（AppKit + WKWebView 壳）
 on:
   push:
     branches: [test]
     paths:
       - 'desktop-build/macos/**'
       - 'web/**'
-      - 'tools/bundle_html.py'
       - '.github/workflows/build-dmg.yml'
   workflow_dispatch:
 
@@ -23,8 +22,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Bundle single-file HTML
-        run: python3 tools/bundle_html.py --out 快捷白板10.html
+      - name: Read version
+        id: ver
+        run: |
+          V=$(python3 -c "import json;print(json.load(open('web/version.json',encoding='utf-8'))['version'])")
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "web version: $V"
 
       - name: Show toolchain
         run: |
@@ -35,10 +38,20 @@ jobs:
       - name: Build unsigned DMG
         run: bash desktop-build/macos/build.sh
 
-      - name: Verify DMG
+      - name: Package artifact
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -e
-          DMG=desktop-build/macos/build/EasiNote.dmg
+          mkdir -p dist
+          cp desktop-build/macos/build/EasiNote.dmg "dist/ParkerEasiNote-${VERSION}.dmg"
+
+      - name: Verify DMG
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -e
+          DMG="dist/ParkerEasiNote-${VERSION}.dmg"
           SIZE=$(stat -f%z "$DMG")
           echo "DMG: $DMG  ${SIZE} B ($((SIZE/1024/1024)) MB)"
           echo "::notice title=DMG 体积::${SIZE} B ($((SIZE/1024)) KB)"
@@ -51,23 +64,23 @@ jobs:
           trap 'hdiutil detach "$MNT" >/dev/null 2>&1 || true' EXIT
 
           ls -la "$MNT"
-          APP="$MNT/快捷白板10.app"
-          [ -d "$APP" ] || APP="$MNT/EasiNote.app"
-          [ -d "$APP" ] || { echo "dmg 里找不到 .app"; exit 1; }
+          APP="$MNT/EasiNote.app"
+          [ -d "$APP" ] || { echo "dmg 里找不到 EasiNote.app"; exit 1; }
 
-          test -f "$APP/Contents/Resources/index.html"
-          grep -q 'ParkerEasiNote10' "$APP/Contents/Resources/index.html" && echo "OK: 页面内容已打入 Resources"
-          grep -q 'EN10_HANZI' "$APP/Contents/Resources/index.html" && echo "OK: 离线资源已内联"
+          test -f "$APP/Contents/Resources/www/index.html"
+          test -f "$APP/Contents/Resources/www/js/app.js"
+          grep -q 'ParkerEasiNote10' "$APP/Contents/Resources/www/index.html" && echo "OK: 多文件页面已打入 Resources/www"
+          grep -q 'css/tokens.css' "$APP/Contents/Resources/www/index.html" && echo "OK: 子资源引用保留（未内联）"
           file "$APP/Contents/MacOS/EasiNote"
           lipo -info "$APP/Contents/MacOS/EasiNote" || true
           plutil -lint "$APP/Contents/Info.plist"
 
-          echo "OK: DMG 结构正常（未签名）"
+          echo "OK: DMG 结构正常（未签名，多文件形式）"
 
       - name: Upload DMG
         uses: actions/upload-artifact@v4
         with:
-          name: easinote-dmg
-          path: desktop-build/macos/build/EasiNote.dmg
+          name: ParkerEasiNote-${{ steps.ver.outputs.version }}-dmg
+          path: dist/ParkerEasiNote-${{ steps.ver.outputs.version }}.dmg
           if-no-files-found: error
           retention-days: 7

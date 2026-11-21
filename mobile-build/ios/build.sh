@@ -30,7 +30,8 @@ xcrun --sdk iphoneos strip -x "$APP/EasiNote" || true
 
 # 2) 组装 .app
 cp "$HERE/Info.plist" "$APP/Info.plist"
-cp "$REPO/快捷白板10.html" "$APP/index.html"
+mkdir -p "$APP/www"
+cp -R "$REPO/web/." "$APP/www/"
 printf 'APPL????' > "$APP/PkgInfo"
 
 # 3) 打包成 ipa（未签名，安装前需自行重签）
