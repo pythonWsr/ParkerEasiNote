@@ -1,0 +1,31 @@
+# pr-twice-cleanup：关闭超时的验证码 issue（§4.2，twice-check-issue-close）
+#
+# 说明：GitHub Actions 的 schedule 最小粒度是 5 分钟（*/2 不会被可靠调度），
+#       因此用 */5；实际关闭窗口为 5–10 分钟，配合 verify 侧的 createdAt 时效校验兜底。
+name: pr-twice-cleanup
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  close-expired:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 关闭超时验证 issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          threshold=$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh issue list --label pr-twice-check --state open --limit 100 \
+            --json number,createdAt \
+            --jq ".[] | select(.createdAt < \"$threshold\") | .number" \
+            | while read -r n; do
+                [ -z "$n" ] && continue
+                gh issue close "$n" --comment "验证码已过期（5 分钟），请重新 --force 获取新码。"
+              done

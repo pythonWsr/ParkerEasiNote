@@ -1,0 +1,109 @@
+# pr-ops：所有 status 写操作的唯一入口（§11）
+#
+# 契约（与 prlib/infra/actions.py 对齐）：
+#   inputs : op / payload(JSON) / actor / nonce
+#   结果   : status 分支 ops/nonce/<nonce>.json
+#   结构   : {"ok": true, "op": "...", "data": {...}}
+#            {"ok": false, "op": "...", "error": {"code": 5, "message": "...", "hint": "..."}}
+#   幂等   : 结果文件已存在则直接退出
+name: pr-ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      op:
+        description: "操作名（见下方白名单）"
+        required: true
+        type: string
+      payload:
+        description: "JSON 字符串"
+        required: false
+        default: "{}"
+        type: string
+      actor:
+        description: "发起人 login"
+        required: false
+        default: ""
+        type: string
+      nonce:
+        description: "本次触发的唯一键"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-status-write
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    env:
+      OP: ${{ inputs.op }}
+      PAYLOAD: ${{ inputs.payload }}
+      ACTOR: ${{ inputs.actor }}
+      NONCE: ${{ inputs.nonce }}
+    steps:
+      - name: 校验 op
+        run: |
+          case "$OP" in
+            create|open|commit|close|pr|remove|restore|reset|rebase|move|transfer|delete|switch|config|merge|release|init|sync|scan|twice-check|verify-twice-check) ;;
+            *) echo "未知 op: $OP"; exit 1 ;;
+          esac
+          if [ -z "$NONCE" ]; then echo "缺少 nonce"; exit 1; fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ secrets.PR_BOT_APP_ID }}
+          private-key: ${{ secrets.PR_BOT_PRIVATE_KEY }}
+
+      - name: 取回 status 分支
+        run: |
+          git fetch origin status
+          git worktree add ../status origin/status
+
+      - name: 幂等检查
+        id: idem
+        run: |
+          if [ -f "../status/ops/nonce/${NONCE}.json" ]; then
+            echo "已有结果，跳过"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 执行状态转移
+        if: steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          python3 -m prlib.ops.server \
+            --status-dir ../status --op "$OP" --payload "$PAYLOAD" \
+            --actor "$ACTOR" --nonce "$NONCE" > ../result.json || true
+          cat ../result.json
+
+      - name: 写回结果并推送
+        if: steps.idem.outputs.skip == 'false'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          mkdir -p "../status/ops/nonce"
+          cp ../result.json "../status/ops/nonce/${NONCE}.json"
+          cd ../status
+          git config user.name "pr-bot[bot]"
+          git config user.email "pr-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "pr-ops: ${OP} [${NONCE}]" || true
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          git push origin HEAD:status
+
+      - name: 校验结果文件
+        if: steps.idem.outputs.skip == 'false'
+        run: |
+          test -f "../status/ops/nonce/${NONCE}.json"
+          echo "结果已写入 ops/nonce/${NONCE}.json"

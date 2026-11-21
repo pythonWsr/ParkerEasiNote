@@ -1,0 +1,56 @@
+# dev-scan：扫描所有 dev 分支异常（§7.13 #12）
+name: dev-scan
+
+on:
+  workflow_dispatch:
+    inputs:
+      nonce:
+        description: "本次扫描的唯一键（客户端生成）"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-status-write
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    env:
+      NONCE: ${{ inputs.nonce }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ secrets.PR_BOT_APP_ID }}
+          private-key: ${{ secrets.PR_BOT_PRIVATE_KEY }}
+
+      - name: 取回 status
+        run: |
+          git fetch origin status
+          git worktree add ../status origin/status
+
+      - name: 执行扫描
+        run: |
+          python3 -m prlib.ops.server --status-dir ../status --op scan \
+            --payload '{}' --actor "" --nonce "$NONCE" > ../scan.json
+          cat ../scan.json
+
+      - name: 写回结果
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          mkdir -p "../status/ops/scan"
+          cp ../scan.json "../status/ops/scan/${NONCE}.json"
+          cd ../status
+          git config user.name "pr-bot[bot]"
+          git config user.email "pr-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "dev-scan: ${NONCE}" || true
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          git push origin HEAD:status

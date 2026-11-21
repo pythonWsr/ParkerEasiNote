@@ -22,6 +22,10 @@
 /.github/workflows/ @pythonWsr
 /version.json @pythonWsr
 
+# pr.py 工具链（pythonWsr 独立编写，非 MIT 授权，见 LICENSE-PRPY）
+/pr.py @pythonWsr
+/prlib/ @pythonWsr
+
 # 授权与声明文件
 /LICENSE @pythonWsr
 /NOTICE @pythonWsr
