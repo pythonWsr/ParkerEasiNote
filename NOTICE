@@ -84,3 +84,24 @@ Accordingly:
    or maintain the software's features and makes no representations, warranties
    or commitments in that regard, and accepts no liability therefor.
 
+----- pr.py / prlib/ / docs/PR.md 专有声明 -----
+
+pr.py、prlib/ 目录与 docs/PR.md 为 pythonWsr 独立编写的工具与文档，不属于
+本仓库原有作品（快捷白板10 / ParkerEasiNote），亦非其衍生作品。上述内容不适用
+本仓库根目录 LICENSE 中的 MIT 协议，版权归 pythonWsr 所有，保留所有权利。
+详见 LICENSE-PRPY。
+
+本仓库原有作品（快捷白板10 / ParkerEasiNote）的著作权仍归原作者 ParkerStudio
+所有，其 MIT 授权不受本节影响。
+
+----- English -----
+
+pr.py / prlib/ / docs/PR.md — Proprietary Notice
+
+pr.py, the prlib/ directory and docs/PR.md are independent works authored
+solely by pythonWsr. They are not part of, nor derived from, the original
+ParkerEasiNote work, and are NOT covered by the MIT License in the
+repository root LICENSE file. All rights reserved. See LICENSE-PRPY.
+
+The original ParkerEasiNote work remains copyright (c) 2026 ParkerStudio
+under the MIT License; this section does not affect it.

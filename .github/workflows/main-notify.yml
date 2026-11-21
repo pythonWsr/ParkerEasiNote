@@ -1,0 +1,56 @@
+# main-notify：main 有新提交时通知各协作者（§7.29）
+name: main-notify
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 收集协作者
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/collaborators" --jq '.[].login' \
+            | grep -v '\[bot\]' > people.txt || true
+          wc -l people.txt
+
+      - name: 生成通知正文
+        run: |
+          {
+            echo "main 新提交：${GITHUB_SHA}  $(git log -1 --pretty=%s)"
+            echo "合入涉及文件：$(git show --stat --oneline --name-only -1 | tail -n +2 | head -20 | paste -sd' ' -)"
+            echo "---"
+            while read -r user; do
+              branch="dev/${user}"
+              if git ls-remote --exit-code origin "refs/heads/${branch}" >/dev/null 2>&1; then
+                if git merge-base --is-ancestor "$GITHUB_SHA" "origin/${branch}" 2>/dev/null; then
+                  echo "@${user} 你的分支 ${branch}：已包含 main 历史，无需操作"
+                else
+                  echo "@${user} 你的分支 ${branch}：落后 main，建议执行 pr.py rebase"
+                fi
+              else
+                echo "@${user} 你还没有 ${branch} 分支"
+              fi
+            done < people.txt
+          } > body.md
+          cat body.md
+
+      - name: 创建通知 issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create \
+            --title "[pr-notify] main 已更新 — ${GITHUB_SHA:0:7}" \
+            --body-file body.md \
+            --label pr-notify || echo "发通知失败（label 可能不存在）"

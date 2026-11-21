@@ -17,3 +17,9 @@ Thumbs.db
 # 本地构建输出目录（打包产物不进入仓库）
 /out/
 mobile-build/android/out/
+
+# Python 运行时缓存 / 测试产物
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage

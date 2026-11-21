@@ -1,0 +1,89 @@
+# build：手动触发的打包（§8.6 / §11.3）
+#
+# 源码在 test 分支（verify-build / mobile-build），本 workflow 固定 checkout test。
+# 产物只上传 artifact / Release，不进入仓库历史。
+name: build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "打包平台"
+        required: true
+        default: all
+        type: choice
+        options: [exe, apk, ipa, all]
+      tag:
+        description: "可选：Release tag（如 v10.0.6），留空只上传 artifact"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  exe:
+    if: ${{ inputs.platform == 'exe' || inputs.platform == 'all' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test
+      - name: 构建 exe
+        shell: cmd
+        run: |
+          cd verify-build
+          build.bat
+      - uses: actions/upload-artifact@v4
+        with:
+          name: easinote-exe
+          path: verify-build/dist/*.exe
+      - name: 上传 Release 资产
+        if: ${{ inputs.tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: gh release upload "${{ inputs.tag }}" verify-build/dist/*.exe --clobber
+
+  apk:
+    if: ${{ inputs.platform == 'apk' || inputs.platform == 'all' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test
+      - name: 构建 apk
+        run: |
+          cd mobile-build/android
+          bash build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: easinote-apk
+          path: mobile-build/android/out/*.apk
+      - name: 上传 Release 资产
+        if: ${{ inputs.tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ inputs.tag }}" mobile-build/android/out/*.apk --clobber
+
+  ipa:
+    if: ${{ inputs.platform == 'ipa' || inputs.platform == 'all' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: test
+      - name: 构建 ipa
+        run: |
+          cd mobile-build/ios
+          bash build.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: easinote-ipa
+          path: mobile-build/ios/out/*.ipa
+      - name: 上传 Release 资产
+        if: ${{ inputs.tag != '' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ inputs.tag }}" mobile-build/ios/out/*.ipa --clobber
