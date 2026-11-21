@@ -6,7 +6,7 @@
 
 打包方式：整个 `web/` 目录原样放进壳里（APK 的 `assets/www/`、IPA 的
 `EasiNote.app/www/`、DMG 的 `Contents/Resources/www/`、EXE 的加密容器），
-不再先生成单文件 HTML。单文件 HTML 只作为独立的可选产物（`build-html.yml`）。
+不再生成单文件 HTML（`build-html.yml` 已停用）。
 
 | 产物 | 壳 | 构建机 | 说明 |
 |---|---|---|---|
@@ -14,8 +14,8 @@
 | `EasiNote.ipa` | iOS `WKWebView` | macos-latest | **未签名**，安装前需自行重签 |
 | `EasiNote.dmg` | macOS `WKWebView` | macos-latest | **未签名**，首次打开需在「隐私与安全性」放行 |
 
-对应工作流：`.github/workflows/build-html.yml`、`build-apk.yml`、`build-ipa.yml`、
-`build-dmg.yml`；Windows exe 见 `build-verify-exe.yml`。各工作流只上传 artifact，
+对应工作流：`.github/workflows/build-apk.yml`、`build-ipa.yml`、`build-dmg.yml`；
+Windows exe 见 `build-verify-exe.yml`。产物名统一为 `ParkerEasiNote-<版本>.<ext>`。各工作流只上传 artifact，
 **不创建 tag / release**；体积只记录不设硬门槛。
 
 ## Android：不用 Gradle
@@ -28,12 +28,16 @@ bash mobile-build/android/build.sh
 ```
 
 - 清单 `minSdk 21 / targetSdk 34`，包名 `com.ParkerEasiNote`，`INTERNET` 权限
-- 页面打进 `assets/index.html`，启动时 `file:///android_asset/index.html`
+- 页面目录打进 `assets/www/`，启动时 `file:///android_asset/www/index.html`
 - 开启 `setDomStorageEnabled(true)`，否则 `localStorage` 不可用
-- 签名用构建时生成的调试 keystore（口令 `android`），仅用于测试安装
+- 签名用仓库内的固定调试 keystore `mobile-build/android/easinote-debug.jks`
+  （alias/口令均为 `easinote`，证书 SHA-256 以 `02:04:4A:04:…` 开头）。
+  **必须保持这把密钥不变**，否则老版本无法覆盖升级；该密钥是公开的调试密钥，
+  仅用于侧载分发，正式上架时应改用 Secrets 注入的正式证书。
 
-体积参考：10.1.7 的单文件页面约 10 MB，APK 压缩后约 4 MB 量级；CI 只打印体积，
-不再设 3 MB 硬门槛。
+体积参考：10.1.7 多文件页面约 8.2 MB，APK 压缩后约 3 MB；CI 只打印体积，不设硬门槛。
+注意 `web/vendor/pdf.min.js` 固定用 **2.6.347**：3.x/2.16 用了可选链（需要 Chromium 80+），
+在华为等旧 WebView 上会解析失败并触发「文件不完整」提示。
 
 ## iOS：不签名
 

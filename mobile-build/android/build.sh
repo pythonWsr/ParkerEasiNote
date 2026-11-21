@@ -52,13 +52,15 @@ cp "$OUT/dex/classes.dex" "$OUT/classes.dex"
 
 # 5) 对齐 + 签名（调试密钥，仅用于测试安装）
 ( cd "$OUT" && "$BT/zipalign" -f 4 app.apk aligned.apk )
-if [ ! -f "$OUT/debug.jks" ]; then
-    keytool -genkeypair -v -keystore "$OUT/debug.jks" -storepass android -keypass android \
-        -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-        -dname "CN=Android Debug,O=Android,C=US" >/dev/null 2>&1
-fi
-"$BT/apksigner" sign --ks "$OUT/debug.jks" --ks-pass pass:android --key-pass pass:android \
-    --out "$OUT/EasiNote.apk" "$OUT/aligned.apk"
+
+# 固定签名：证书必须与历史版本一致，否则无法覆盖安装。
+# 说明：这是公开的调试密钥（密码 easinote），仅用于侧载分发；
+# 若以后要上架或做正式签名，改用 GitHub Secrets 注入正式 keystore。
+KEYSTORE="$HERE/easinote-debug.jks"
+[ -f "$KEYSTORE" ] || { echo "[apk] 缺少固定签名文件: $KEYSTORE" >&2; exit 1; }
+"$BT/apksigner" sign --ks "$KEYSTORE" --ks-pass pass:easinote --key-pass pass:easinote \
+    --alias easinote --out "$OUT/EasiNote.apk" "$OUT/aligned.apk"
 "$BT/apksigner" verify --verbose "$OUT/EasiNote.apk" | head -5
+"$BT/apksigner" verify --print-certs "$OUT/EasiNote.apk" | grep -i "SHA-256" || true
 
 ls -l "$OUT/EasiNote.apk"
