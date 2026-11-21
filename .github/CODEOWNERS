@@ -12,7 +12,8 @@
 * @pythonWsr
 
 # 主程序
-/快捷白板10.html @pythonWsr
+/index.html @pythonWsr
+/DELETEME.md @pythonWsr
 
 # 代码所有者配置本身：防止被绕过
 /.github/CODEOWNERS @pythonWsr
