@@ -139,7 +139,9 @@ def build(root: Path, drop_ttf: bool) -> str:
     # ---- 4) PDF.js worker：base64 → Blob URL ----
     worker = root / "vendor" / "pdf.worker.min.js"
     if PDF_WORKER_LITERAL in html and worker.is_file():
-        worker_b64 = base64.b64encode(worker.read_bytes()).decode("ascii")
+        # 按文本读再编码，统一 CRLF→LF，保证不同平台产出一致
+        worker_src = worker.read_text(encoding="utf-8").encode("utf-8")
+        worker_b64 = base64.b64encode(worker_src).decode("ascii")
         blob_script = (
             "<script>\n"
             "window.__EN10_PDF_WORKER_URL__=(function(){try{"
