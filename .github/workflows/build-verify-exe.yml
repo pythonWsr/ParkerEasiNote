@@ -1,6 +1,7 @@
 name: build-verify-exe
 
 # 仅在 test 分支上构建；页面与构建配置都不进入 main
+# 说明：验证用的 VerifyDemo.exe 不再打包，只出正式产物 EasiNote.exe
 on:
   push:
     branches: [test]
@@ -59,57 +60,40 @@ jobs:
         with:
           arch: x64
 
-      - name: Build VerifyDemo.exe
-        shell: cmd
-        run: build.bat verify VerifyDemo.exe
-
       - name: Build EasiNote.exe (快捷白板10)
         shell: cmd
         run: build.bat easinote EasiNote.exe
 
-      - name: Verify artifacts
+      - name: Verify artifact
         shell: pwsh
         run: |
-          $targets = @(
-            @{ Path = 'dist\VerifyDemo.exe'; Markers = @('verifyBox','loadingBox','0.30000000000000004'); U16 = @('机器人验证') },
-            @{ Path = 'dist\EasiNote.exe';    Markers = @('EN10_HANZI','drawing-board','快捷白板10 备课版'); U16 = @('快捷白板10') }
-          )
           $fail = $false
-          foreach ($t in $targets) {
-            $exe = Get-Item $t.Path
-            "{0}  {1:N0} B  ({2:N1} KB)" -f $exe.Name, $exe.Length, ($exe.Length / 1KB)
-            Write-Host "::notice title=$($exe.Name) 体积::$([math]::Round($exe.Length/1KB,1)) KB"
+          $markers = @('EN10_HANZI','drawing-board','快捷白板10 备课版')
+          $u16 = @('快捷白板10')
 
-            $text = [IO.File]::ReadAllBytes($exe.FullName)
-            $utf8 = [Text.Encoding]::UTF8.GetString($text)
-            foreach ($m in $t.Markers) {
-              if ($utf8.Contains($m)) { Write-Error ($exe.Name + ' 出现明文页面片段: ' + $m); $fail = $true }
-            }
-            $u16 = [Text.Encoding]::Unicode.GetString($text)
-            foreach ($s in $t.U16) {
-              if (-not $u16.Contains($s)) { Write-Error ($exe.Name + ' 缺少 UTF-16 字符串: ' + $s); $fail = $true }
-            }
+          $exe = Get-Item 'dist\EasiNote.exe'
+          "{0}  {1:N0} B  ({2:N1} KB)" -f $exe.Name, $exe.Length, ($exe.Length / 1KB)
+          Write-Host "::notice title=$($exe.Name) 体积::$([math]::Round($exe.Length/1KB,1)) KB"
+
+          $text = [IO.File]::ReadAllBytes($exe.FullName)
+          $utf8 = [Text.Encoding]::UTF8.GetString($text)
+          foreach ($m in $markers) {
+            if ($utf8.Contains($m)) { Write-Error ($exe.Name + ' 出现明文页面片段: ' + $m); $fail = $true }
+          }
+          $u16text = [Text.Encoding]::Unicode.GetString($text)
+          foreach ($s in $u16) {
+            if (-not $u16text.Contains($s)) { Write-Error ($exe.Name + ' 缺少 UTF-16 字符串: ' + $s); $fail = $true }
           }
           if ($fail) { exit 1 }
           Write-Host 'OK: 体积已记录、无明文泄漏、UTF-16 中文串正常'
 
-      - name: Selftest (decryption inside the real binaries)
+      - name: Selftest (decryption inside the real binary)
         shell: pwsh
         run: |
-          foreach ($n in @('VerifyDemo.exe','EasiNote.exe')) {
-            $p = Start-Process -FilePath (Resolve-Path (Join-Path 'dist' $n)) -ArgumentList '--selftest' -PassThru -Wait
-            Write-Host ("{0} --selftest 退出码: {1}" -f $n, $p.ExitCode)
-            if ($p.ExitCode -ne 0) { Write-Error ($n + ' 解密自检失败'); exit 1 }
-          }
-          Write-Host 'OK: 两个二进制的解密链路都正常'
-
-      - name: Upload VerifyDemo
-        uses: actions/upload-artifact@v4
-        with:
-          name: verify-exe
-          path: verify-build/dist/VerifyDemo.exe
-          if-no-files-found: error
-          retention-days: 7
+          $p = Start-Process -FilePath (Resolve-Path 'dist\EasiNote.exe') -ArgumentList '--selftest' -PassThru -Wait
+          Write-Host ("EasiNote.exe --selftest 退出码: {0}" -f $p.ExitCode)
+          if ($p.ExitCode -ne 0) { Write-Error 'EasiNote.exe 解密自检失败'; exit 1 }
+          Write-Host 'OK: 解密链路正常'
 
       - name: Upload EasiNote
         uses: actions/upload-artifact@v4
