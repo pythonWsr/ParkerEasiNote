@@ -1,4 +1,4 @@
-package local.easinote;
+package com.ParkerEasiNote;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;

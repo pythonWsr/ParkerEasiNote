@@ -1,0 +1,65 @@
+name: build-html
+
+# 仅 test 分支：把 web/ 下的多文件应用打包成一个完全离线的单文件 HTML
+on:
+  push:
+    branches: [test]
+    paths:
+      - 'web/**'
+      - 'tools/bundle_html.py'
+      - '.github/workflows/build-html.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    name: 单文件 HTML（离线）
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show source version
+        run: |
+          echo "web/version.json:"
+          cat web/version.json
+
+      - name: Bundle
+        run: python3 tools/bundle_html.py --out dist/快捷白板10.html
+
+      - name: Verify single-file HTML
+        run: |
+          set -e
+          F=dist/快捷白板10.html
+          SIZE=$(stat -c%s "$F")
+          echo "HTML: $F  ${SIZE} B ($((SIZE/1024)) KB)"
+          echo "::notice title=单文件 HTML 体积::${SIZE} B ($((SIZE/1024)) KB)"
+          sha256sum "$F"
+
+          # 不得残留任何本地相对引用
+          if grep -qE '<script[^>]+src="(js|vendor|data)/' "$F"; then echo "残留 script 外链"; exit 1; fi
+          if grep -qE '<link[^>]+href="(css|vendor|assets)/' "$F"; then echo "残留 link 外链"; exit 1; fi
+
+          # 关键内容必须在
+          for m in 'EN10_HANZI' 'EN10_POEMS' '__EN10_PDF_WORKER_URL__' 'ParkerEasiNote10' 'drawing-board'; do
+            grep -q "$m" "$F" || { echo "缺少标记: $m"; exit 1; }
+          done
+
+          # 标签必须成对（内联脚本里不能提前出现 </script>）
+          OPEN=$(grep -o '<script' "$F" | wc -l)
+          CLOSE=$(grep -o '</script>' "$F" | wc -l)
+          echo "script 标签: $OPEN 开 / $CLOSE 闭"
+          [ "$OPEN" = "$CLOSE" ] || { echo "script 标签不配对"; exit 1; }
+
+          echo "OK: 单文件结构正常"
+
+      - name: Upload HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: easinote-html
+          path: dist/快捷白板10.html
+          if-no-files-found: error
+          retention-days: 7

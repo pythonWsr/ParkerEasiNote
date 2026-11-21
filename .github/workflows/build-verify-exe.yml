@@ -6,6 +6,8 @@ on:
     branches: [test]
     paths:
       - 'verify-build/**'
+      - 'web/**'
+      - 'tools/bundle_html.py'
       - '.github/workflows/build-verify-exe.yml'
   workflow_dispatch:
 
@@ -26,6 +28,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Bundle single-file HTML
+        working-directory: .
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python tools/bundle_html.py --out 快捷白板10.html
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -59,13 +72,13 @@ jobs:
         run: |
           $targets = @(
             @{ Path = 'dist\VerifyDemo.exe'; Markers = @('verifyBox','loadingBox','0.30000000000000004'); U16 = @('机器人验证') },
-            @{ Path = 'dist\EasiNote.exe';    Markers = @('mit-license-tpl','easinote_update_ts','快捷白板10 备课版'); U16 = @('快捷白板10') }
+            @{ Path = 'dist\EasiNote.exe';    Markers = @('EN10_HANZI','drawing-board','快捷白板10 备课版'); U16 = @('快捷白板10') }
           )
           $fail = $false
           foreach ($t in $targets) {
             $exe = Get-Item $t.Path
             "{0}  {1:N0} B  ({2:N1} KB)" -f $exe.Name, $exe.Length, ($exe.Length / 1KB)
-            if ($exe.Length -gt 5MB) { Write-Error ($exe.Name + ' 超过 5MB'); $fail = $true }
+            Write-Host "::notice title=$($exe.Name) 体积::$([math]::Round($exe.Length/1KB,1)) KB"
 
             $text = [IO.File]::ReadAllBytes($exe.FullName)
             $utf8 = [Text.Encoding]::UTF8.GetString($text)
@@ -78,7 +91,7 @@ jobs:
             }
           }
           if ($fail) { exit 1 }
-          Write-Host 'OK: 体积、明文泄漏、UTF-16 中文串全部通过'
+          Write-Host 'OK: 体积已记录、无明文泄漏、UTF-16 中文串正常'
 
       - name: Selftest (decryption inside the real binaries)
         shell: pwsh

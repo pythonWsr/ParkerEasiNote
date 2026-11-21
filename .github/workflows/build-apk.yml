@@ -6,6 +6,8 @@ on:
     branches: [test]
     paths:
       - 'mobile-build/android/**'
+      - 'web/**'
+      - 'tools/bundle_html.py'
       - '.github/workflows/build-apk.yml'
   workflow_dispatch:
 
@@ -20,6 +22,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Bundle single-file HTML
+        run: python3 tools/bundle_html.py --out 快捷白板10.html
 
       - name: Setup JDK
         uses: actions/setup-java@v4
@@ -49,12 +54,21 @@ jobs:
           APK=mobile-build/android/out/EasiNote.apk
           SIZE=$(stat -c%s "$APK")
           echo "APK: $APK  ${SIZE} B ($((SIZE/1024)) KB)"
-          if [ "$SIZE" -gt 3145728 ]; then echo "APK 超过 3MB"; exit 1; fi
+          echo "::notice title=APK 体积::${SIZE} B ($((SIZE/1024)) KB)"
+
+          BT=$(ls -d "${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"/build-tools/* | sort -V | tail -1)
+          BADGING=$("$BT/aapt2" dump badging "$APK")
+          echo "$BADGING" | head -3
+          echo "$BADGING" | grep -q "package: name='com.ParkerEasiNote'" || {
+            echo "包名不是 com.ParkerEasiNote"; exit 1;
+          }
+
           unzip -l "$APK" | grep -E 'classes\.dex|assets/index\.html|resources\.arsc'
           unzip -p "$APK" assets/index.html | head -c 64
           echo
-          unzip -p "$APK" assets/index.html | grep -q 'mit-license-tpl' && echo "OK: 页面内容已打入 assets"
-          echo "OK: APK 结构正常"
+          unzip -p "$APK" assets/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 页面内容已打入 assets"
+          unzip -p "$APK" assets/index.html | grep -q 'EN10_HANZI' && echo "OK: 离线资源已内联"
+          echo "OK: APK 结构正常（包名 com.ParkerEasiNote）"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4

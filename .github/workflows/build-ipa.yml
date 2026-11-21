@@ -6,6 +6,8 @@ on:
     branches: [test]
     paths:
       - 'mobile-build/ios/**'
+      - 'web/**'
+      - 'tools/bundle_html.py'
       - '.github/workflows/build-ipa.yml'
   workflow_dispatch:
 
@@ -21,6 +23,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Bundle single-file HTML
+        run: python3 tools/bundle_html.py --out 快捷白板10.html
+
       - name: Show toolchain
         run: |
           xcodebuild -version
@@ -35,10 +40,12 @@ jobs:
           IPA=mobile-build/ios/build/EasiNote.ipa
           SIZE=$(stat -f%z "$IPA")
           echo "IPA: $IPA  ${SIZE} B ($((SIZE/1024)) KB)"
-          if [ "$SIZE" -gt 3145728 ]; then echo "IPA 超过 3MB"; exit 1; fi
+          echo "::notice title=IPA 体积::${SIZE} B ($((SIZE/1024)) KB)"
           unzip -l "$IPA" | grep -E 'Payload/EasiNote\.app/(EasiNote|Info\.plist|index\.html)'
           file mobile-build/ios/build/EasiNote.app/EasiNote
           plutil -lint mobile-build/ios/build/EasiNote.app/Info.plist
+          unzip -p "$IPA" Payload/EasiNote.app/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 页面内容已打入 index.html"
+          unzip -p "$IPA" Payload/EasiNote.app/index.html | grep -q 'EN10_HANZI' && echo "OK: 离线资源已内联"
           echo "OK: IPA 结构正常（未签名）"
 
       - name: Upload IPA

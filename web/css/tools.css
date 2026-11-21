@@ -1,0 +1,66 @@
+/* ============================================================
+   学科工具细节与补充样式
+   ============================================================ */
+
+/* ---- 汉字卡 ---- */
+.hz-item{display:flex;flex-direction:column;align-items:center}
+.hz-py{font-size:15px;font-weight:700;color:var(--brand-700);letter-spacing:.5px;margin-bottom:6px;min-height:20px}
+.hz-item .tian-grid{width:190px}
+.hz-item .tian-grid .hz{font-size:120px}
+.hz-item .tian-grid .hz.small{font-size:96px}
+.hz-item:hover .tian-grid{border-color:var(--brand-line);box-shadow:0 8px 22px rgba(45,195,96,.12)}
+
+/* ---- 词典发音按钮（白底上要看得见） ---- */
+.dict-item .bib-mini{color:#6B7883;background:#F1F5F8;border-radius:50%;width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.dict-item .bib-mini:hover{background:var(--brand-50);color:var(--brand-700)}
+
+/* ---- 函数列表 ---- */
+.fx-item input.field.sm{font-family:var(--font-num);font-size:12.5px}
+.fx-item .bib-mini{color:var(--text-3)}
+.fx-item .bib-mini:hover{background:var(--paper-3);color:var(--danger)}
+
+/* ---- AI 对话附加图 ---- */
+.chat-thumb{display:block;max-width:220px;max-height:150px;border-radius:10px;margin-bottom:7px;border:1px solid rgba(255,255,255,.35);object-fit:contain;background:#fff}
+.chat-attach{display:flex;align-items:center;gap:9px;padding:8px 12px;background:#F3F8F5;border-top:1px solid #E4EDE7}
+.chat-attach img{width:46px;height:46px;object-fit:cover;border-radius:9px;border:1px solid #D8E6DD;background:#fff}
+.chat-attach-meta{flex:1;min-width:0}
+.chat-attach-meta b{display:block;font-size:12px;color:#1B8641;font-weight:800}
+.chat-attach-meta span{display:block;font-size:10.5px;color:#8B97A2;margin-top:2px}
+.chat-attach-x{width:26px;height:26px;border:0;border-radius:50%;background:#E4EDE7;color:#5B6B63;cursor:pointer;font-size:10px}
+.chat-attach-x:hover{background:#D6E4DB}
+
+/* ---- 关于页容器 ---- */
+.about-wrap{position:relative;overflow:hidden;min-height:100%}
+.about-wrap .about-scroll{position:relative;z-index:3}
+
+/* ---- API 教程 ---- */
+.guide-list{display:flex;flex-direction:column;gap:2px}
+.guide-step{display:flex;gap:11px;padding:10px 2px;border-bottom:1px dashed #EEF2F6}
+.guide-step:last-child{border-bottom:0}
+.gs-n{width:24px;height:24px;flex:0 0 24px;border-radius:50%;background:var(--brand-50);color:var(--brand-700);
+  font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px}
+.gs-c b{display:block;font-size:13.5px;color:#16241D;font-weight:800}
+.gs-c p{margin:4px 0 0;font-size:12px;line-height:1.7;color:#6B7883}
+.gs-c code{font-family:var(--font-num);font-size:11.5px;background:#F1F4F7;padding:1px 5px;border-radius:5px;color:#B5316C}
+
+/* ---- 更新 / 关于 弹窗的滚动 ---- */
+.update-modal .modal{max-width:480px}
+.about-modal .modal-body::-webkit-scrollbar{width:0}
+
+/* ---- 3D 场景 ---- */
+.planet-stage canvas{display:block}
+.subject-pane:has(.planet-stage){padding:0;overflow:hidden}
+.subject-pane:has(.mm-wrap){padding:0;overflow:hidden}
+
+/* ---- 选择模式指针（桌面端必须看得见） ---- */
+body.tool-select-mode #drawing-board{cursor:crosshair!important}
+body.selecting #drawing-board{cursor:crosshair!important}
+
+/* ---- 磁贴层的 3D 容器 ---- */
+.tiles-inner{transition:transform .5s var(--e-out)}
+
+/* ---- 计时 FAB 在窄屏写小一点 ---- */
+@media (max-width:640px){
+  #timer-fab{height:32px;font-size:13px;padding:0 12px 0 10px}
+  .timer-big .big-digits{letter-spacing:2px}
+}
