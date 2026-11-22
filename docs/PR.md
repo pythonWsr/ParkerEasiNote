@@ -30,7 +30,7 @@ python pr.py pr                        # 提 PR 到 pr 分支
 
 # 在 main 上：
 python pr.py approve <PR编号>
-python pr.py merge <PR编号>            # 仅仓库所有者
+python pr.py merge <PR编号>            # 仅仓库所有者；自动完成 pr → main 并 admin 合并
 ```
 
 全程可加 `--dry-run`：只校验、不写 status、不 push、不开 issue。
@@ -100,6 +100,13 @@ A：auto-check（配置项 `auto-check`）只在写命令前做一次 `fetch sta
 **Q：`review-self` 明明是 true 却不生效？**
 A：该配置项被强制关闭（仓库不允许自我审批），`pr.py` 会提示并忽略。
 
+**Q：`merge` 为什么把别人的 PR 也带进了 main？**
+A：`merge` 会把 `pr` 分支当前**全部内容**合入 main，包括尚未单独 merge 的其它 PR。
+单 PR 顺序合并没有问题；多协作者并发提交的语义待定（`docs/TECH_DEBT.md` TD-8）。
+
+**Q：approve 之后还需要额外 merge 一次 pr 分支吗？**
+A：不需要。`pr.py merge` 会先合 PR，再自动创建/复用 `pr → main` 的 PR 并 admin 合并。
+
 ## 7. 配置（status 分支 `config.ini`）
 
 - 优先级：`[global]` 的 `<key>.force = true` > `[<user>]` > `[global]` > 内置默认
@@ -119,3 +126,47 @@ prlib/ops/server.py   Actions 侧唯一写 status 的实现
 .github/workflows/    pr-ops / dev-scan / main-notify / build
 docs/TECH_DEBT.md     已知技术债
 ```
+
+## 9. 实战用例与历史错误（M4/M5）
+
+### 9.1 merge：一步合入 main
+
+`pr.py merge <PR>` 做三件事：
+
+1. 若 PR 未合并，先合入它的 base（通常是 `pr` 分支）
+2. 自动创建/复用 `pr → main` 的 PR，并用 admin 合并（对应"owner 手动 merge"）
+3. 把 PR 涉及文件置为 `pushed`，并记录 merge commit 到 `latest.json`
+
+> ⚠️ 会把 `pr` 分支当前全部内容合入 main，包括尚未单独 merge 的其它 PR。
+> 单 PR 顺序合并没有问题；并发语义见 `docs/TECH_DEBT.md` TD-8。
+
+### 9.2 `--cancel`：恢复"僵尸 waiting"
+
+场景：PR 已在网页或别处关闭，但 status 仍是 `waiting`，文件无法再次 open。
+
+```bash
+git switch <你的 dev 分支>
+python pr.py pr --cancel
+```
+
+文件回到 `committed`，之后可重新 `pr.py pr` 创建新 PR。
+
+### 9.3 release：draft → build → publish
+
+```bash
+python pr.py release v10.1.7 --dry-run          # 只看计划
+python pr.py release v10.1.7 --stop-after-draft # 只到 draft + build，不发布
+python pr.py release v10.1.7                    # 全流程
+```
+
+流程：创建 draft Release → 触发 `build.yml`（html/exe/apk/ipa/dmg 并行）→ 等待成功 →
+draft 转正 → `op=release` 写 `status/version.json`。
+IPA 只进 artifact（§27，需协作者签名后手动上传），其余四个附件进 Release。
+
+### 9.4 历史错误记录（均已修复）
+
+| 现象 | 原因 | 修复 |
+|---|---|---|
+| `create` 后 `git switch dev/x` 失败 | 只写 status，没建本地分支 | create 成功后 `git switch -c` |
+| `commit` 成功但远端没有提交 | 只写 status，没执行 add/commit/push | 真正 add → commit → push，并记录 SHA |
+| `merge` 后 main 没有任何变化 | 只合入 base=`pr`，未提升到 main | 自动 `pr→main` + 状态置 `pushed` |
