@@ -206,3 +206,15 @@ def test_init_is_idempotent_and_seeds_version(tmp_path):
 
     second = server.apply_op("init", {}, "alice", str(tmp_path))
     assert second["ok"] and second["data"]["initialized"] == []
+
+
+def test_commit_records_sha_and_file_state(tmp_path):
+    server.apply_op("init", {}, "alice", str(tmp_path))
+    server.apply_op("open", {"file": "a.js"}, "alice", str(tmp_path))
+    server.apply_op(
+        "commit", {"files": ["a.js"], "sha": "abc123", "branch": "dev/alice"}, "alice", str(tmp_path)
+    )
+    latest = json.loads((tmp_path / "latest.json").read_text(encoding="utf-8"))
+    assert latest["shas"] == ["abc123"]
+    assert latest["files"]["a.js"]["last_commit"] == "abc123"
+    assert latest["files"]["a.js"]["branch"] == "dev/alice"
