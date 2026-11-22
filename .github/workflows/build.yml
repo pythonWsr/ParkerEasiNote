@@ -72,12 +72,12 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           set -euo pipefail
-          gh workflow run "${{ matrix.workflow }}" --ref test
+          gh workflow run "${{ matrix.workflow }}" --ref test -R "$GITHUB_REPOSITORY"
           sleep 8
           RID=$(gh run list --workflow "${{ matrix.workflow }}" --branch test \
-                  --limit 1 --json databaseId --jq '.[0].databaseId')
+                  -R "$GITHUB_REPOSITORY" --limit 1 --json databaseId --jq '.[0].databaseId')
           echo "rid=$RID" >> "$GITHUB_OUTPUT"
-          gh run watch "$RID" --exit-status
+          gh run watch "$RID" -R "$GITHUB_REPOSITORY" --exit-status
 
       - name: 下载 artifact
         if: ${{ inputs.platform == 'all' || inputs.platform == matrix.key }}
@@ -87,8 +87,8 @@ jobs:
         run: |
           set -euo pipefail
           NAME="ParkerEasiNote-${VERSION}-${{ matrix.key }}"
-          gh run download "${{ steps.trigger.outputs.rid }}" --name "$NAME" --dir dist \
-            || gh run download "${{ steps.trigger.outputs.rid }}" --dir dist
+          gh run download "${{ steps.trigger.outputs.rid }}" -R "$GITHUB_REPOSITORY" --name "$NAME" --dir dist \
+            || gh run download "${{ steps.trigger.outputs.rid }}" -R "$GITHUB_REPOSITORY" --dir dist
           ls -l dist
 
       - uses: actions/upload-artifact@v4
@@ -105,7 +105,7 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           set -euo pipefail
-          gh release upload "${{ inputs.tag }}" dist/* --clobber || gh release upload "${{ inputs.tag }}" dist/*.dmg dist/*.exe dist/*.apk dist/*.html --clobber
+          gh release upload "${{ inputs.tag }}" dist/* -R "$GITHUB_REPOSITORY" --clobber
 
       - name: IPA 说明
         if: ${{ matrix.key == 'ipa' && (inputs.platform == 'all' || inputs.platform == 'ipa') }}
