@@ -369,6 +369,11 @@ class Git:
     def switch(self, name: str, dry_run: bool = False) -> CommandResult:
         return self._run(["switch", name], dry_run=dry_run, mutating=True, check=False)
 
+    def changed_files(self, base: str = "origin/main") -> List[str]:
+        """本分支相对 base 改动过的文件（用于 pr 只收本分支真正改过的文件）。"""
+        out = self._run(["diff", "--name-only", "%s...HEAD" % base]).stdout
+        return [line.strip() for line in out.splitlines() if line.strip()]
+
     def add(self, paths: Sequence[str], dry_run: bool = False) -> CommandResult:
         return self._run(["add", "--"] + list(paths), dry_run=dry_run, mutating=True, check=False)
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from ...core import rules, transition
 from ...core.errors import Rejection, RejectionCode
-from ._common import record_fields, reject, twice_reason_text, verify_twice_check, with_verification
+from ._common import fail, record_fields, reject, twice_reason_text, verify_twice_check, with_verification
 from ..context import Context
 
 SKIP = "skip"
@@ -28,6 +28,11 @@ def run(ctx: Context, args) -> int:
         for path, record in active.items()
         if record_fields(record)[1] == ctx.user
     }
+    # 只收本分支真正改过的文件，避免把"自己持有但本分支没动"的文件也带进 PR
+    changed = set(ctx.git.changed_files("origin/main"))
+    mine = {path: value for path, value in mine.items() if path in changed}
+    if not mine:
+        return fail(ctx, "本分支相对 origin/main 没有文件改动", 3)
     twice_ok = False
     if args.twice_check:
         twice_ok, reason = verify_twice_check(ctx, "pr", ",".join(sorted(mine)) or "-", args.twice_check)
