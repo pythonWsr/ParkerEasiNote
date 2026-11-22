@@ -1,0 +1,10 @@
+{
+  "assets": {},
+  "latest": null,
+  "schema": 3,
+  "tool": {
+    "pr.py": {
+      "version": "1.0.0"
+    }
+  }
+}
