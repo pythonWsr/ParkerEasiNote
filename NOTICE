@@ -84,3 +84,33 @@ Accordingly:
    or maintain the software's features and makes no representations, warranties
    or commitments in that regard, and accepts no liability therefor.
 
+----- 构建与权限说明（test 分支打包产物，非协议条款）-----
+
+一、权限映射（APK / IPA / DMG 一致）
+
+状态    能力        Android                          iOS / macOS
+可用    相机        CAMERA（运行时申请）              NSCameraUsageDescription
+可用    麦克风      RECORD_AUDIO（运行时申请）        NSMicrophoneUsageDescription
+降级    写入存储    WRITE_EXTERNAL_STORAGE            NSPhotoLibraryAddUsageDescription
+                    （maxSdkVersion=28）
+忽略    网络访问    INTERNET                          —（WKWebView 无对应权限）
+
+说明：
+1. Android 侧除清单权限外，还需 WebChromeClient.onPermissionRequest 放行，
+   MainActivity 已实现；否则页面能点但拿不到摄像头/麦克风流。
+2. iOS 额外声明 NSPhotoLibraryUsageDescription（选图读取）。
+3. macOS 缺少 usage description 时，WKWebView 请求摄像头会直接崩溃。
+
+二、Android 11+ 安装前提
+
+1. APK 必须带 v2 签名（build.sh 已显式开启 v1/v2/v3 并打印证书 SHA-256）。
+2. resources.arsc 必须未压缩且 4 字节对齐（build.sh 已用 zipalign 校验）。
+3. 若设备曾安装过不同签名密钥的旧版本，需要先卸载再安装。
+4. 通过即时通讯软件转发的 .apk 可能被改名/截断，请从 GitHub Actions
+   artifact 直接下载原始文件。
+
+三、图标
+
+IPA 由 build.sh 用 sips 从 AppIcon-1024.png 生成 9 个尺寸并写入 Info.plist；
+DMG 由 sips + iconutil 从 web/assets/img/logo.png（回退 AppIcon-1024.png）
+生成 AppIcon.icns。缺少图标时构建会失败，不再静默产出白图标。

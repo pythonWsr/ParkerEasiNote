@@ -51,24 +51,7 @@ bash mobile-build/ios/build.sh
 - arm64，最低 iOS 12
 - `Payload/EasiNote.app/` 内含 `EasiNote`（可执行）、`Info.plist`、`index.html`
 - **无代码签名**：真机安装前需要用自有证书重签（`codesign` + `ldid`/`altool` 等方式）
-- 图标：`build.sh` 用 `sips` 从 `AppIcon-1024.png` 生成 9 个尺寸并写入 `Info.plist`
-  的 `CFBundleIcons`（不再白图标）；缺少母版时构建会告警
-
-## 权限映射（APK / IPA 一致）
-
-| 状态 | 能力 | Android | iOS |
-|---|---|---|---|
-| 可用 | 相机 | `CAMERA`（运行时申请） | `NSCameraUsageDescription` |
-| 可用 | 麦克风 | `RECORD_AUDIO`（运行时申请） | `NSMicrophoneUsageDescription` |
-| 降级 | 写入存储 | `WRITE_EXTERNAL_STORAGE`（`maxSdkVersion=28`） | `NSPhotoLibraryAddUsageDescription` |
-| 忽略 | 网络访问 | `INTERNET` | —（WKWebView 无对应权限） |
-
-补充：
-
-- Android WebView 里 `getUserMedia` 还需要 `WebChromeClient.onPermissionRequest` 放行，
-  `MainActivity` 已实现；否则页面有按钮但拿不到流
-- iOS 的 `NSPhotoLibraryUsageDescription`（读相册）只在需要选图时使用，已一并声明
-- 权限说明文案在 `mobile-build/ios/Info.plist`，改文案不需要重建壳代码
+- 未提供 App 图标资源（需要 Asset Catalog），当前为系统默认图标
 
 ## 体积
 

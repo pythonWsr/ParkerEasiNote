@@ -75,6 +75,18 @@ jobs:
           lipo -info "$APP/Contents/MacOS/EasiNote" || true
           plutil -lint "$APP/Contents/Info.plist"
 
+          # 图标：缺 .icns 时 Finder/Dock 是白图标
+          test -f "$APP/Contents/Resources/AppIcon.icns" \
+            || { echo "缺少 AppIcon.icns（会显示白图标）"; exit 1; }
+          echo "图标大小: $(stat -f%z "$APP/Contents/Resources/AppIcon.icns") B"
+
+          # 权限：与 APK/IPA 的相机/麦克风/相册写入对应
+          for K in NSCameraUsageDescription NSMicrophoneUsageDescription NSPhotoLibraryAddUsageDescription; do
+            /usr/libexec/PlistBuddy -c "Print :$K" "$APP/Contents/Info.plist" >/dev/null \
+              || { echo "缺少权限说明: $K"; exit 1; }
+          done
+          echo "OK: 图标与权限声明齐全"
+
           echo "OK: DMG 结构正常（未签名，多文件形式）"
 
       - name: Upload DMG

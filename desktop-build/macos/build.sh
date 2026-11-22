@@ -31,21 +31,33 @@ mkdir -p "$APP/Contents/Resources/www"
 cp -R "$REPO/web/." "$APP/Contents/Resources/www/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# 3) 图标：从页面自带的 logo.png 生成 .icns（失败不影响构建）
-ICON_SRC="$REPO/web/assets/img/logo.png"
-if [ -f "$ICON_SRC" ] && command -v iconutil >/dev/null 2>&1 && command -v sips >/dev/null 2>&1; then
-    ICONSET="$BUILD/AppIcon.iconset"
-    mkdir -p "$ICONSET"
-    for s in 16 32 64 128 256 512; do
-        sips -z "$s" "$s" "$ICON_SRC" --out "$ICONSET/icon_${s}x${s}.png" >/dev/null 2>&1 || true
-        sips -z "$((s * 2))" "$((s * 2))" "$ICON_SRC" --out "$ICONSET/icon_${s}x${s}@2x.png" >/dev/null 2>&1 || true
-    done
-    if iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns" 2>/dev/null; then
-        echo "[dmg] 图标已生成"
-    else
-        echo "[dmg] 图标生成失败，使用系统默认图标"
-    fi
+# 3) 图标：优先用页面 logo，其次用 mobile 的 1024 母版；生成失败直接报错，
+#    避免"装完是白图标"却静默通过。
+ICON_SRC=""
+for candidate in "$REPO/web/assets/img/logo.png" "$REPO/mobile-build/ios/AppIcon-1024.png"; do
+    if [ -f "$candidate" ]; then ICON_SRC="$candidate"; break; fi
+done
+if [ -z "$ICON_SRC" ]; then
+    echo "[dmg] 找不到图标母版（web/assets/img/logo.png 或 mobile-build/ios/AppIcon-1024.png）" >&2
+    exit 1
 fi
+ICONSET="$BUILD/AppIcon.iconset"
+mkdir -p "$ICONSET"
+# 只生成 iconset 规范要求的尺寸，避免 iconutil 因多余条目失败
+for pair in "16 16" "16 32" "32 32" "32 64" "128 128" "128 256" "256 256" "256 512" "512 512" "512 1024"; do
+    base=${pair%% *}
+    px=${pair##* }
+    if [ "$base" = "$px" ]; then
+        out="$ICONSET/icon_${base}x${base}.png"
+    else
+        out="$ICONSET/icon_${base}x${base}@2x.png"
+    fi
+    sips -z "$px" "$px" "$ICON_SRC" --out "$out" >/dev/null
+done
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+[ -s "$APP/Contents/Resources/AppIcon.icns" ] || { echo "[dmg] AppIcon.icns 生成失败" >&2; exit 1; }
+echo "[dmg] 图标已生成：$(ls -l "$APP/Contents/Resources/AppIcon.icns" | awk '{print $5}') B（源：$ICON_SRC）"
+
 
 # 4) 打 dmg（未签名，未公证；首次打开需在「隐私与安全性」里放行）
 rm -rf "$STAGE"
