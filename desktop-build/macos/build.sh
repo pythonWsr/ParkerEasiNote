@@ -56,7 +56,7 @@ for pair in "16 16" "16 32" "32 32" "32 64" "128 128" "128 256" "256 256" "256 5
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 [ -s "$APP/Contents/Resources/AppIcon.icns" ] || { echo "[dmg] AppIcon.icns 生成失败" >&2; exit 1; }
-echo "[dmg] 图标已生成：$(ls -l "$APP/Contents/Resources/AppIcon.icns" | awk '{print $5}') B（源：$ICON_SRC）"
+echo "[dmg] 图标已生成：$(ls -l "$APP/Contents/Resources/AppIcon.icns" | awk '{print $5}') B（源：${ICON_SRC}）"
 
 
 # 4) 打 dmg（未签名，未公证；首次打开需在「隐私与安全性」里放行）
