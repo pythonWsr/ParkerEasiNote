@@ -1,8 +1,7 @@
 {
   "index.html": {
-    "branch": "dev/test-alice-1795317042",
     "operator": "pythonWsr",
-    "status": "committed",
-    "updated_at": "2026-11-22T03:12:24Z"
+    "status": "waiting",
+    "updated_at": "2026-11-22T03:12:57Z"
   }
 }
