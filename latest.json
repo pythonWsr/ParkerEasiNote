@@ -10,6 +10,11 @@
     }
   },
   "files": {
+    "DELETEME.md": {
+      "branch": "dev/m4-4-test-1795320420",
+      "last_commit": "41123c6823447e7ddd0c4b568537ca6bed28d8e3",
+      "updated_at": "2026-11-22T04:08:25Z"
+    },
     "index.html": {
       "branch": "dev/test-alice-1795317042",
       "last_commit": "1a21e3ef42af12b0507f41e049749e2b5d50b9ff",
@@ -17,6 +22,7 @@
     }
   },
   "shas": [
-    "1a21e3ef42af12b0507f41e049749e2b5d50b9ff"
+    "1a21e3ef42af12b0507f41e049749e2b5d50b9ff",
+    "41123c6823447e7ddd0c4b568537ca6bed28d8e3"
   ]
 }
