@@ -7,6 +7,7 @@ M2 结项时确认、**不阻塞 M3** 的已知问题。每项都记录了位置
 | TD-3 | 通知按 `createdAt` 在本地过滤 | `prlib/infra/gh.py::list_issues` | 分页场景可能漏数据、issue 多时拉取慢 | M3 加 `--since/--last` 参数映射到 `gh issue list --search "created:>=YYYY-MM-DD"`，本地只做兜底 |
 | TD-5 | `follow_renames` 对字符串形态的 `renamed` 提示不够精确 | `prlib/core/transition.py` | 报"缺少目标路径"可能让人误以为记录是 dict 只是漏字段 | 低优先：文案改为"renamed 记录不是带 to 的对象" |
 | TD-6 | `rebase_onto` 的非冲突失败没有细分原因 | `prlib/infra/git.py` | 只能看到 stderr 原文（工作区脏 / 已在 rebase / 分支即 main） | 已保留 `error` 字段；后续可按 stderr 关键字映射成 `reason` 枚举 |
+| TD-7 | `op=release` 写 `status/version.json` 时 `assets.*.size/sha256` 仍是占位（0 / ""） | `prlib/ops/server.py::release` | 客户端若校验大小/摘要会拿到空值 | 从 Release API 回填：`gh api /repos/{repo}/releases/tags/{tag}/assets` |
 
 ## 已解决（不进债表）
 
