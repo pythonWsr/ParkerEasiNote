@@ -369,6 +369,9 @@ class Git:
     def switch(self, name: str, dry_run: bool = False) -> CommandResult:
         return self._run(["switch", name], dry_run=dry_run, mutating=True, check=False)
 
+    def add(self, paths: Sequence[str], dry_run: bool = False) -> CommandResult:
+        return self._run(["add", "--"] + list(paths), dry_run=dry_run, mutating=True, check=False)
+
     def commit(self, paths: Sequence[str], message: str = "", dry_run: bool = False) -> CommandResult:
         args = ["commit", "-m", message or "pr.py commit"] + (["--"] + list(paths) if paths else [])
         return self._run(args, dry_run=dry_run, mutating=True, check=False)

@@ -319,9 +319,16 @@ def apply_op(
         data = {"file": path}
     elif op == "commit":
         files = payload.get("files") or []
+        sha = str(payload.get("sha") or "")
+        branch = payload.get("branch")
+        file_state = latest.setdefault("files", {})
         for path in files:
-            _set(active, path, states.COMMITTED, actor, branch=payload.get("branch"))
-        data = {"files": files}
+            _set(active, path, states.COMMITTED, actor, branch=branch)
+            if sha:
+                file_state[path] = {"last_commit": sha, "updated_at": _now(), "branch": branch}
+        if sha:
+            latest.setdefault("shas", []).append(sha)
+        data = {"files": files, "sha": sha}
     elif op == "close":
         path = str(payload.get("file") or "")
         _set(active, path, states.CLOSED, actor)

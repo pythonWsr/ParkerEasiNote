@@ -29,6 +29,31 @@ def run(ctx: Context, args) -> int:
     result = transition.try_commit(records, ctx.user, ctx.config)
     if not result.ok:
         return reject(ctx, result.rejection)
-    data = ctx.apply("commit", {"files": files, "message": args.message})
-    ctx.output.success("commit", {"files": files, "result": data})
+    branch = ctx.current_branch()
+    sha = ""
+    if not ctx.dry_run:
+        added = ctx.git.add(files)
+        if added.returncode != 0:
+            return fail(ctx, "git add 失败：%s" % added.stderr.strip(), 1)
+        committed = ctx.git.commit(files, args.message or "pr.py commit")
+        if committed.returncode != 0:
+            return fail(
+                ctx,
+                "git commit 失败：%s" % (committed.stderr or committed.stdout).strip(),
+                1,
+            )
+        sha = ctx.git.head_sha()
+        pushed = ctx.git.push(branch)
+        if pushed.returncode != 0:
+            return fail(
+                ctx,
+                "git push 失败：%s" % pushed.stderr.strip(),
+                1,
+                "本地已提交但未推送；修好后 pr.py sync",
+            )
+    data = ctx.apply(
+        "commit",
+        {"files": files, "message": args.message, "sha": sha, "branch": branch},
+    )
+    ctx.output.success("commit", {"files": files, "sha": sha, "branch": branch, "result": data})
     return 0
