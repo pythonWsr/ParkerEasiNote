@@ -89,6 +89,11 @@ jobs:
           done
           echo "OK: 权限齐全"
 
+          # Android 11+ 安装硬要求：resources.arsc 必须未压缩且 4 字节对齐
+          "$BT/zipalign" -c -v 4 "$APK" >/dev/null \
+            || { echo "zipalign 校验失败（Android 11+ 可能无法安装）"; exit 1; }
+          echo "OK: zipalign 4 字节对齐"
+
           # 签名方案：Android 11+ 对 targetSdk>=30 强制 v2，缺了会"部分设备装不上"
           "$BT/apksigner" verify --verbose "$APK" | grep -q "Verified using v2 scheme" \
             || { echo "缺少 v2 签名"; exit 1; }
