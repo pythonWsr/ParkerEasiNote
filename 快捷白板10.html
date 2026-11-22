@@ -4895,8 +4895,8 @@ function showUpdate(){
 /* 多源回退：jsDelivr 仓库清单 → raw 仓库清单 → GitHub Releases API。
    任何一个源成功即止；全部失败静默退出，不影响离线/内网使用。 */
 var UPDATE_MANIFEST_URLS = [
-    'https://cdn.jsdelivr.net/gh/pythonWsr/ParkerEasiNote@main/version.json',
-    'https://raw.githubusercontent.com/pythonWsr/ParkerEasiNote/main/version.json'
+    'https://cdn.jsdelivr.net/gh/pythonWsr/ParkerEasiNote@status/version.json',
+    'https://raw.githubusercontent.com/pythonWsr/ParkerEasiNote/status/version.json'
 ];
 var UPDATE_API_URL = 'https://api.github.com/repos/pythonWsr/ParkerEasiNote/releases/latest';
 var UPDATE_FALLBACK_URL = 'https://github.com/pythonWsr/ParkerEasiNote/releases/latest';

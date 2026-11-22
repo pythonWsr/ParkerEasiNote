@@ -159,6 +159,8 @@ def build_parser() -> argparse.ArgumentParser:
     p = cmd("release", "发版（仅仓库所有者）")
     p.add_argument("version")
     p.add_argument("--no-latest", action="store_true")
+    p.add_argument("--stop-after-draft", dest="stop_after_draft", action="store_true",
+                   help="只创建 draft Release 并完成 build，不转正")
 
     p = cmd("merge", "把审批通过的 PR 合入 main（仅仓库所有者）")
     p.add_argument("number", type=int)

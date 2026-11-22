@@ -248,8 +248,29 @@ def apply_op(
             },
         }
 
-    if op in ("merge", "release"):
-        return {"ok": True, "op": op, "data": dict(payload), "todo": "由 workflow 完成 gh/release 侧动作"}
+    if op == "merge":
+        return {"ok": True, "op": op, "data": dict(payload), "todo": "gh pr merge 在 CLI 侧完成"}
+
+    if op == "release":
+        number = str(payload.get("version") or "")
+        tag = str(payload.get("tag") or ("v" + number))
+        repo = os.environ.get("GITHUB_REPOSITORY", "pythonWsr/ParkerEasiNote")
+        base = "https://github.com/%s/releases/download/%s" % (repo, tag)
+        version["schema"] = 3
+        version["latest"] = number
+        version["is_latest"] = bool(payload.get("latest", True))
+        version["release_url"] = "https://github.com/%s/releases/tag/%s" % (repo, tag)
+        assets = version.setdefault("assets", {})
+        for key in ("html", "exe", "apk", "dmg"):
+            assets[key] = {
+                "version": number,
+                "url": "%s/ParkerEasiNote-%s.%s" % (base, number, key),
+                "size": 0,
+                "sha256": "",
+            }
+        assets.setdefault("ipa", {"version": number, "url": "", "size": 0, "sha256": ""})
+        _write(status_dir, "version.json", version)
+        return {"ok": True, "op": op, "data": {"version": number, "tag": tag}}
 
     if op in ("reset", "rebase", "sync"):
         return {"ok": True, "op": op, "data": dict(payload)}

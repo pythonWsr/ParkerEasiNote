@@ -328,6 +328,42 @@ class Gh:
             return
         self._gh(args)
 
+    def create_release(
+        self,
+        tag: str,
+        draft: bool = True,
+        target: str = "main",
+        title: str = "",
+        notes: str = "",
+        dry_run: bool = False,
+    ) -> None:
+        args = ["release", "create", tag, "--target", target,
+                "--title", title or tag, "--notes", notes or ("Release " + tag)]
+        if draft:
+            args.append("--draft")
+        if dry_run:
+            self.last_plan = args
+            return
+        self._gh(args)
+
+    def edit_release(self, tag: str, draft: bool = False, dry_run: bool = False) -> None:
+        args = ["release", "edit", tag, "--draft=%s" % ("true" if draft else "false")]
+        if dry_run:
+            self.last_plan = args
+            return
+        self._gh(args)
+
+    def release_view(self, tag: str) -> dict:
+        data = self._json(["release", "view", tag, "--json", "tagName,isDraft,assets,url"])
+        return dict(data or {})
+
+    def latest_run_any(self, workflow: str) -> dict:
+        runs = self._json(
+            ["run", "list", "--workflow", workflow, "--limit", "1",
+             "--json", "databaseId,status,conclusion,createdAt"]
+        ) or []
+        return dict(runs[0]) if runs else {}
+
     def list_runs(self, workflow: str, limit: int = 10) -> List[dict]:
         data = self._json(
             [
