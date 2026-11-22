@@ -114,3 +114,11 @@ Accordingly:
 IPA 由 build.sh 用 sips 从 AppIcon-1024.png 生成 9 个尺寸并写入 Info.plist；
 DMG 由 sips + iconutil 从 web/assets/img/logo.png（回退 AppIcon-1024.png）
 生成 AppIcon.icns。缺少图标时构建会失败，不再静默产出白图标。
+
+四、图标母版与产物收集
+
+1. 三端统一使用根目录 快捷白板10.ico 导出的 assets/icon-256.png：
+   APK 的 mipmap-* 已由该母版重新生成，IPA/DMG 构建时用 sips/iconutil 生成各尺寸；
+   Windows exe 使用的 verify-build/res/app.ico 与该 ico 为同一文件。
+2. 本地收集产物：bash tools/fetch_artifacts.sh 会把 test 分支最近一次成功的
+   html/exe/apk/ipa/dmg 下载到仓库根目录 out/（/out/ 已被 .gitignore 忽略）。

@@ -34,8 +34,12 @@ mkdir -p "$APP/www"
 cp -R "$REPO/web/." "$APP/www/"
 printf 'APPL????' > "$APP/PkgInfo"
 
-# 2.1) 图标：从 1024 母版生成 iOS 需要的各尺寸（否则侧载后是白图标）
-ICON_SRC="$HERE/AppIcon-1024.png"
+# 2.1) 图标：统一使用根目录图标（assets/icon-256.png，由 快捷白板10.ico 导出），
+#      不再依赖各平台各存一份；生成 iOS 需要的各尺寸，否则侧载后是白图标。
+ICON_SRC=""
+for candidate in "$REPO/assets/icon-256.png" "$HERE/AppIcon-1024.png"; do
+    if [ -f "$candidate" ]; then ICON_SRC="$candidate"; break; fi
+done
 if [ -f "$ICON_SRC" ]; then
     gen_icon() {
         sips -z "$2" "$2" "$ICON_SRC" --out "$APP/$1" >/dev/null

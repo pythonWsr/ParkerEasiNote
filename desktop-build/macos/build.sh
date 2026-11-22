@@ -31,14 +31,14 @@ mkdir -p "$APP/Contents/Resources/www"
 cp -R "$REPO/web/." "$APP/Contents/Resources/www/"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# 3) 图标：优先用页面 logo，其次用 mobile 的 1024 母版；生成失败直接报错，
-#    避免"装完是白图标"却静默通过。
+# 3) 图标：统一使用根目录图标（assets/icon-256.png，由 快捷白板10.ico 导出）；
+#    回退页面 logo / mobile 母版。生成失败直接报错，避免"装完是白图标"却静默通过。
 ICON_SRC=""
-for candidate in "$REPO/web/assets/img/logo.png" "$REPO/mobile-build/ios/AppIcon-1024.png"; do
+for candidate in "$REPO/assets/icon-256.png" "$REPO/web/assets/img/logo.png" "$REPO/mobile-build/ios/AppIcon-1024.png"; do
     if [ -f "$candidate" ]; then ICON_SRC="$candidate"; break; fi
 done
 if [ -z "$ICON_SRC" ]; then
-    echo "[dmg] 找不到图标母版（web/assets/img/logo.png 或 mobile-build/ios/AppIcon-1024.png）" >&2
+    echo "[dmg] 找不到图标母版（assets/icon-256.png / web/assets/img/logo.png / mobile-build/ios/AppIcon-1024.png）" >&2
     exit 1
 fi
 ICONSET="$BUILD/AppIcon.iconset"

@@ -7,6 +7,7 @@ on:
     paths:
       - 'desktop-build/macos/**'
       - 'web/**'
+      - 'assets/**'
       - '.github/workflows/build-dmg.yml'
   workflow_dispatch:
 
