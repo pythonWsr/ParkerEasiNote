@@ -236,3 +236,14 @@ def test_release_writes_version_json_assets(tmp_path):
         assert version["assets"][key]["version"] == "10.1.7"
         assert "releases/download/v10.1.7" in version["assets"][key]["url"]
     assert version["assets"]["ipa"]["url"] == ""
+
+
+def test_merge_sets_pushed_and_records_sha(tmp_path):
+    server.apply_op("init", {}, "alice", str(tmp_path))
+    server.apply_op("open", {"file": "a.js"}, "alice", str(tmp_path))
+    server.apply_op("merge", {"files": ["a.js"], "sha": "merge123"}, "alice", str(tmp_path))
+    active = json.loads((tmp_path / "active.json").read_text(encoding="utf-8"))
+    latest = json.loads((tmp_path / "latest.json").read_text(encoding="utf-8"))
+    assert active["a.js"]["status"] == "pushed"
+    assert latest["files"]["a.js"]["last_commit"] == "merge123"
+    assert "merge123" in latest["shas"]

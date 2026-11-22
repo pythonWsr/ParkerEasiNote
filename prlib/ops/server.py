@@ -249,7 +249,18 @@ def apply_op(
         }
 
     if op == "merge":
-        return {"ok": True, "op": op, "data": dict(payload), "todo": "gh pr merge 在 CLI 侧完成"}
+        merged = payload.get("files") or []
+        sha = str(payload.get("sha") or "")
+        file_state = latest.setdefault("files", {})
+        for path in merged:
+            _set(active, path, states.PUSHED, actor)
+            if sha:
+                file_state.setdefault(path, {})["last_commit"] = sha
+        if sha:
+            latest.setdefault("shas", []).append(sha)
+        _write(status_dir, "active.json", active)
+        _write(status_dir, "latest.json", latest)
+        return {"ok": True, "op": op, "data": {"files": merged, "sha": sha}}
 
     if op == "release":
         number = str(payload.get("version") or "")
