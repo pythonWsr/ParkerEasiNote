@@ -81,6 +81,19 @@ jobs:
           echo
           unzip -p "$APK" assets/www/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 多文件页面已打入 assets/www"
           unzip -p "$APK" assets/www/index.html | grep -q 'css/tokens.css' && echo "OK: 子资源引用保留（未内联）"
+
+          # 权限：相机 / 麦克风 / 写入存储 / 网络
+          for P in CAMERA RECORD_AUDIO WRITE_EXTERNAL_STORAGE INTERNET; do
+            echo "$BADGING" | grep -q "uses-permission: name='android.permission.$P'" \
+              || { echo "缺少权限: $P"; exit 1; }
+          done
+          echo "OK: 权限齐全"
+
+          # 签名方案：Android 11+ 对 targetSdk>=30 强制 v2，缺了会"部分设备装不上"
+          "$BT/apksigner" verify --verbose "$APK" | grep -q "Verified using v2 scheme" \
+            || { echo "缺少 v2 签名"; exit 1; }
+          "$BT/apksigner" verify --print-certs "$APK" | head -4
+          echo "OK: 签名含 v2"
           echo "OK: APK 结构正常（包名 com.ParkerEasiNote，多文件形式）"
 
       - name: Upload APK

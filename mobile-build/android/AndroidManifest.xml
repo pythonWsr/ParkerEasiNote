@@ -6,8 +6,25 @@
 
     <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
 
+    <!-- 网络：页面资源全部打进 assets，INTERNET 只用于 CDN / 在线功能 -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- 相机 / 麦克风：拍照插入、语音录制（运行时再申请） -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- 写入存储：Android 9 及以下降级路径；10+ 走分区存储 -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- 没有相机/麦克风的设备也能装（权限不设为 required） -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <application
         android:label="快捷白板10"
@@ -15,6 +32,7 @@
         android:allowBackup="true"
         android:hardwareAccelerated="true"
         android:usesCleartextTraffic="true"
+        android:requestLegacyExternalStorage="true"
         android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
 
         <activity

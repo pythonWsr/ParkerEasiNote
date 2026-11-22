@@ -59,6 +59,20 @@ jobs:
           plutil -lint mobile-build/ios/build/EasiNote.app/Info.plist
           unzip -p "$IPA" Payload/EasiNote.app/www/index.html | grep -q 'ParkerEasiNote10' && echo "OK: 多文件页面已打入 www"
           unzip -p "$IPA" Payload/EasiNote.app/www/index.html | grep -q 'css/tokens.css' && echo "OK: 子资源引用保留（未内联）"
+
+          # 图标：必须真的打进包，否则侧载后是白图标
+          unzip -l "$IPA" | grep -q 'Payload/EasiNote.app/AppIcon60x60@2x.png' \
+            || { echo "缺少 AppIcon60x60@2x.png（会显示白图标）"; exit 1; }
+          ICONS=$(unzip -l "$IPA" | grep -c 'Payload/EasiNote.app/AppIcon.*\.png' || true)
+          echo "图标数量: $ICONS"
+          [ "$ICONS" -ge 8 ] || { echo "图标数量不足: $ICONS"; exit 1; }
+
+          # 权限声明：与 Android 的 CAMERA / RECORD_AUDIO / WRITE_EXTERNAL_STORAGE 映射
+          for K in NSCameraUsageDescription NSMicrophoneUsageDescription NSPhotoLibraryAddUsageDescription; do
+            /usr/libexec/PlistBuddy -c "Print :$K" mobile-build/ios/build/EasiNote.app/Info.plist >/dev/null \
+              || { echo "缺少权限说明: $K"; exit 1; }
+          done
+          echo "OK: 图标与权限声明齐全"
           echo "OK: IPA 结构正常（未签名，多文件形式）"
 
       - name: Upload IPA

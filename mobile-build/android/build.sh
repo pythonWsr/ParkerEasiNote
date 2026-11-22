@@ -58,10 +58,17 @@ cp "$OUT/dex/classes.dex" "$OUT/classes.dex"
 # 若以后要上架或做正式签名，改用 GitHub Secrets 注入正式 keystore。
 KEYSTORE="$HERE/easinote-debug.jks"
 [ -f "$KEYSTORE" ] || { echo "[apk] 缺少固定签名文件: $KEYSTORE" >&2; exit 1; }
+# 显式开启 v1/v2/v3：Android 11+ 对 targetSdk>=30 强制要求 v2，
+# 明确写出来避免不同 build-tools 的默认值差异导致"部分设备装不上"。
 "$BT/apksigner" sign --ks "$KEYSTORE" --ks-key-alias easinote \
     --ks-pass pass:easinote --key-pass pass:easinote \
+    --min-sdk-version 21 \
+    --v1-signing-enabled true --v2-signing-enabled true --v3-signing-enabled true \
     --out "$OUT/EasiNote.apk" "$OUT/aligned.apk"
-"$BT/apksigner" verify --verbose "$OUT/EasiNote.apk" | head -5
+"$BT/apksigner" verify --verbose "$OUT/EasiNote.apk" | sed -n '1,12p'
+echo "[apk] --- 权限 ---"
+"$BT/aapt2" dump badging "$OUT/EasiNote.apk" | grep '^uses-permission' || true
+echo "[apk] --- 签名证书 SHA-256（应与历史版本一致）---"
 "$BT/apksigner" verify --print-certs "$OUT/EasiNote.apk" | grep -i "SHA-256" || true
 
 ls -l "$OUT/EasiNote.apk"
