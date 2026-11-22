@@ -218,3 +218,21 @@ def test_commit_records_sha_and_file_state(tmp_path):
     assert latest["shas"] == ["abc123"]
     assert latest["files"]["a.js"]["last_commit"] == "abc123"
     assert latest["files"]["a.js"]["branch"] == "dev/alice"
+
+
+def test_release_writes_version_json_assets(tmp_path):
+    server.apply_op("init", {}, "alice", str(tmp_path))
+    server.apply_op(
+        "release",
+        {"version": "10.1.7", "tag": "v10.1.7", "latest": True},
+        "alice",
+        str(tmp_path),
+    )
+    version = json.loads((tmp_path / "version.json").read_text(encoding="utf-8"))
+    assert version["schema"] == 3
+    assert version["latest"] == "10.1.7"
+    assert version["is_latest"] is True
+    for key in ("html", "exe", "apk", "dmg"):
+        assert version["assets"][key]["version"] == "10.1.7"
+        assert "releases/download/v10.1.7" in version["assets"][key]["url"]
+    assert version["assets"]["ipa"]["url"] == ""
