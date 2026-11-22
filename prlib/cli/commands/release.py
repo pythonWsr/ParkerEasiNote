@@ -51,8 +51,9 @@ def run(ctx: Context, args) -> int:
     except GhError as exc:
         ctx.output.warn("创建 draft Release 失败（可能已存在）：%s" % exc)
 
+    baseline = int(ctx.gh.latest_run_any(BUILD_WORKFLOW).get("databaseId") or 0)
     ctx.gh.run_workflow(BUILD_WORKFLOW, {"platform": "all", "tag": tag})
-    run_id = _wait_for_build(ctx)
+    run_id = _wait_for_build(ctx, baseline)
 
     if args.stop_after_draft:
         ctx.output.success(
@@ -70,9 +71,8 @@ def run(ctx: Context, args) -> int:
     return 0
 
 
-def _wait_for_build(ctx: Context) -> int:
-    """等 build.yml 本次触发的 run 完成（按 run id 增大判定新 run）。"""
-    baseline = int(ctx.gh.latest_run_any(BUILD_WORKFLOW).get("databaseId") or 0)
+def _wait_for_build(ctx: Context, baseline: int) -> int:
+    """等 build.yml 本次触发的 run 完成（基线在触发前抓取，避免把自己当成旧 run）。"""
     deadline = time.time() + BUILD_TIMEOUT
     while time.time() < deadline:
         info = ctx.gh.latest_run_any(BUILD_WORKFLOW)
