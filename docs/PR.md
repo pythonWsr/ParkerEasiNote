@@ -170,3 +170,15 @@ IPA 只进 artifact（§27，需协作者签名后手动上传），其余四个
 | `create` 后 `git switch dev/x` 失败 | 只写 status，没建本地分支 | create 成功后 `git switch -c` |
 | `commit` 成功但远端没有提交 | 只写 status，没执行 add/commit/push | 真正 add → commit → push，并记录 SHA |
 | `merge` 后 main 没有任何变化 | 只合入 base=`pr`，未提升到 main | 自动 `pr→main` + 状态置 `pushed` |
+
+## 10. 上手须知（交付前必读）
+
+1. **`pr` 分支没有保护**：仓库目前只有 `main-protection`（main）与 `status-protection`（status）
+   两个规则集，`pr` 分支不受规则集约束。请勿直接 `git push origin pr`，所有改动一律走
+   `dev/* → pr` 的 PR（`pr.py pr`）。
+2. **`merge` 会把 `pr` 分支当前全部内容合入 main**：`pr.py merge A` 时，`pr` 上尚未单独
+   merge 的 B、C（`waiting` 状态）也会一并进入 main。多人并行开发时先协调合并顺序。
+3. **`--dry-run` 不等于有权限**：dry-run 跳过 owner 校验（`merge` / `release` 在 dry-run 下直接放行），
+   真实执行时才检查仓库所有者身份。
+
+> M5.1 给 `pr` 分支补规则集后，第 1、2 条的行为会变化，届时同步更新本文档。
