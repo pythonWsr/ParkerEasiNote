@@ -55,6 +55,8 @@ jobs:
           if [ -z "$NONCE" ]; then echo "缺少 nonce"; exit 1; fi
 
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/create-github-app-token@v1
         id: app
@@ -64,6 +66,7 @@ jobs:
 
       - name: 取回 status 分支
         run: |
+          git config --unset-all http.https://github.com/.extraheader || true
           git fetch origin status
           git worktree add ../status origin/status
 

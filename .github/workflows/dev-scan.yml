@@ -23,6 +23,8 @@ jobs:
       NONCE: ${{ inputs.nonce }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: actions/create-github-app-token@v1
         id: app
@@ -32,6 +34,7 @@ jobs:
 
       - name: 取回 status
         run: |
+          git config --unset-all http.https://github.com/.extraheader || true
           git fetch origin status
           git worktree add ../status origin/status
 
