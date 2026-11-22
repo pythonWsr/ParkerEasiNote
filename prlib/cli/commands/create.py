@@ -20,6 +20,12 @@ def run(ctx: Context, args) -> int:
         return reject(ctx, rejection)
     payload = {"branch": args.branch, "public": bool(args.public)}
     data = ctx.apply("create", payload)
+    if not ctx.dry_run:
+        created = ctx.git.create_branch(args.branch)
+        if created.returncode != 0:
+            switched = ctx.git.switch(args.branch)
+            if switched.returncode != 0:
+                ctx.output.warn("本地分支创建失败，请手动 git switch --create %s" % args.branch)
     ctx.output.success(
         "create",
         {"branch": args.branch, "public": bool(args.public), "result": data},

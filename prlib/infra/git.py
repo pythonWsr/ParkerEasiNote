@@ -360,6 +360,15 @@ class Git:
         ok = result.returncode == 0
         return PushOutcome(ok, command, False, (result.stderr or "").strip())
 
+    def create_branch(self, name: str, base: str = "origin/main", dry_run: bool = False) -> CommandResult:
+        """新建本地分支并切换（失败时调用方再试 switch）。"""
+        return self._run(
+            ["switch", "-c", name, base], dry_run=dry_run, mutating=True, check=False
+        )
+
+    def switch(self, name: str, dry_run: bool = False) -> CommandResult:
+        return self._run(["switch", name], dry_run=dry_run, mutating=True, check=False)
+
     def commit(self, paths: Sequence[str], message: str = "", dry_run: bool = False) -> CommandResult:
         args = ["commit", "-m", message or "pr.py commit"] + (["--"] + list(paths) if paths else [])
         return self._run(args, dry_run=dry_run, mutating=True, check=False)
