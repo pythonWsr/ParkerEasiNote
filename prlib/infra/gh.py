@@ -328,6 +328,13 @@ class Gh:
             return
         self._gh(args)
 
+    def pr_view(self, number: int) -> dict:
+        data = self._json([
+            "pr", "view", str(number),
+            "--json", "number,state,baseRefName,mergeCommit,files",
+        ])
+        return dict(data or {})
+
     def create_release(
         self,
         tag: str,
