@@ -3,6 +3,7 @@ package com.ParkerEasiNote;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -12,6 +13,7 @@ import android.util.Log;
 import android.view.WindowManager;
 import android.webkit.ConsoleMessage;
 import android.webkit.JavascriptInterface;
+import android.webkit.MimeTypeMap;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -122,7 +124,20 @@ public class MainActivity extends Activity {
                 }
                 fileCallback = callback;
                 try {
-                    startActivityForResult(params.createIntent(), REQ_FILE);
+                    startActivityForResult(buildChooserIntent(params), REQ_FILE);
+                } catch (ActivityNotFoundException exc) {
+                    /* 极少数设备没有 DocumentsUI：退化成“任意文件”再试一次 */
+                    try {
+                        Intent fallback = new Intent(Intent.ACTION_GET_CONTENT);
+                        fallback.addCategory(Intent.CATEGORY_OPENABLE);
+                        fallback.setType("*/*");
+                        startActivityForResult(fallback, REQ_FILE);
+                    } catch (Exception inner) {
+                        fileCallback = null;
+                        Toast.makeText(MainActivity.this, "没有可用的文件选择器",
+                                Toast.LENGTH_LONG).show();
+                        return false;
+                    }
                 } catch (Exception exc) {
                     fileCallback = null;
                     Toast.makeText(MainActivity.this, "无法打开文件选择器：" + exc.getMessage(),
@@ -176,6 +191,51 @@ public class MainActivity extends Activity {
         if (!missing.isEmpty()) {
             requestPermissions(missing.toArray(new String[0]), REQ_MEDIA);
         }
+    }
+
+    /**
+     * 自建选择器 Intent。
+     * WebView 的 FileChooserParams.createIntent() 会把 accept=".pptx,.docx" 原样当 MIME 用
+     * （真机报 type=.pptx → No Activity found），这里把扩展名映射成标准 MIME。
+     */
+    private Intent buildChooserIntent(WebChromeClient.FileChooserParams params) {
+        List<String> mimes = new ArrayList<String>();
+        String[] accepts = params.getAcceptTypes();
+        if (accepts != null) {
+            for (String raw : accepts) {
+                if (raw == null) {
+                    continue;
+                }
+                for (String part : raw.split(",")) {
+                    String token = part.trim().toLowerCase();
+                    if (token.isEmpty()) {
+                        continue;
+                    }
+                    if (token.startsWith(".")) {
+                        String mime = MimeTypeMap.getSingleton()
+                                .getMimeTypeFromExtension(token.substring(1));
+                        if (mime != null && !mimes.contains(mime)) {
+                            mimes.add(mime);
+                        }
+                    } else if (token.contains("/")) {
+                        if (!mimes.contains(token)) {
+                            mimes.add(token);
+                        }
+                    }
+                }
+            }
+        }
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        intent.setType("*/*");
+        if (!mimes.isEmpty()) {
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, mimes.toArray(new String[0]));
+        }
+        if (params.getMode() == WebChromeClient.FileChooserParams.MODE_OPEN_MULTIPLE) {
+            intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
+        }
+        return intent;
     }
 
     @Override
