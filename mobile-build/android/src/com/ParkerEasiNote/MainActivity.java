@@ -138,18 +138,6 @@ public class MainActivity extends Activity {
                 return true;
             }
 
-            @SuppressWarnings("deprecation")
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                if (url.startsWith("file://") || url.startsWith("about:") || url.startsWith("data:")) {
-                    return false;
-                }
-                try {
-                    startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                } catch (Exception ignored) {
-                }
-                return true;
-            }
         });
         web.setBackgroundColor(0xFF0F261E);
         setContentView(web);
