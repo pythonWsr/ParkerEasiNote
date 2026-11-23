@@ -33,10 +33,16 @@
     { id:'camera', name:'视频展台', icon:'camera', run: function(){ var b=document.getElementById('btn-camera'); if(b) b.click(); } }
   ];
 
+  function tileIcon(name){
+    try{ return enIcon(name, 30); }
+    catch(err){ return '<i class="fas fa-circle"></i>'; }
+  }
+
   function build(){
     if(built) return;
     built = true;
     layer = document.getElementById('tiles-layer');
+    if(!layer){ built = false; throw new Error('缺少 #tiles-layer'); }
     layer.innerHTML =
       '<div class="tiles-scrim"></div>' +
       '<div class="tiles-scene">' +
@@ -52,7 +58,7 @@
     rail.innerHTML = ITEMS.map(function(it, i){
       return '<button class="tile" data-id="' + it.id + '" data-i="' + i + '">' +
         (it.tag ? '<em>' + it.tag + '</em>' : '') +
-        '<i class="tile-ic">' + enIcon(it.icon, 30) + '</i><span>' + it.name + '</span></button>';
+        '<i class="tile-ic">' + tileIcon(it.icon) + '</i><span>' + it.name + '</span></button>';
     }).join('');
 
     layer.querySelector('.tiles-close').onclick = function(){ close(); };

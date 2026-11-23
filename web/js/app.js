@@ -1565,10 +1565,16 @@ $('tool-more').onclick = function(e){
     e.stopPropagation();
     /* 更多：Win8 磁贴面板（3D 飞入 + 背景模糊） */
     if(window.EN10Tiles){
-        closeSubmenu();
-        if(S.tool !== 'more') clearSelectionAndSwitch('more');
-        window.EN10Tiles.toggle();
-        return;
+        try{
+            closeSubmenu();
+            if(S.tool !== 'more') clearSelectionAndSwitch('more');
+            window.EN10Tiles.toggle();
+            return;
+        }catch(err){
+            /* WebView 等环境里磁贴面板若抛错，退回旧子菜单，至少保证“更多”可用 */
+            console.error(err);
+            try{ EN10.toast('更多面板打开失败：' + ((err && err.message) || err), 'fa-exclamation-triangle'); }catch(_){}
+        }
     }
     if(S.submenuTarget === e.currentTarget && !D.submenu.classList.contains('hide')){ closeSubmenu(); return; }
     if(S.tool !== 'more') clearSelectionAndSwitch('more');
