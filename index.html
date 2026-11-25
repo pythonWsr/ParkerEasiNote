@@ -2,179 +2,166 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>快捷白板10 · 在线演示</title>
-<!--
-  临时入口页：内嵌 快捷白板10.html。
-  本页面不修改原文件，仅在「内嵌副本」加载时注入限制：
-  禁用 API Key 输入与全部 AI 相关功能（原因与免责声明见仓库 NOTICE）。
--->
-<style>
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0}
-  body{display:flex;flex-direction:column;background:#0F261E;color:#e8f5ee;
-       font:13px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
-  #stage{position:relative;flex:1;min-height:0;background:#0F261E}
-  #app{width:100%;height:100%;border:0;display:block;background:#0F261E}
-  .loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:10px;color:#9fd4b4;font-size:13px}
-  .loading i{width:9px;height:9px;border-radius:50%;background:#2DC360;animation:p 1s ease-in-out infinite}
-  @keyframes p{0%,100%{opacity:.3}50%{opacity:1}}
-  .fallback{position:absolute;inset:0;display:none;align-items:center;justify-content:center;padding:24px;text-align:center}
-  .fallback .card{max-width:520px;line-height:1.8}
-  .fallback h1{font-size:15px;margin:0 0 10px;color:#fff}
-  .fallback p{margin:0 0 12px;color:#a9cdb8;font-size:12.5px}
-  .fallback a{color:#7ee2a8}
-</style>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0F261E">
+<title>ParkerEasiNote10 · 快捷白板</title>
+<link rel="icon" href="assets/img/logo.png">
+<!-- 全部依赖均已本地化，断网可运行 -->
+<link rel="stylesheet" href="vendor/fa/css/all.min.css">
+<link rel="stylesheet" href="css/tokens.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/components.css">
+<link rel="stylesheet" href="css/tools.css">
 </head>
 <body>
-  <div id="stage">
-    <div class="loading" id="loading"><i></i><span>正在载入 快捷白板10…</span></div>
-    <iframe id="app" title="快捷白板10 在线演示"></iframe>
-    <div class="fallback" id="fallback">
-      <div class="card">
-        <h1>无法在线载入演示</h1>
-        <p>本页面通过脚本读取原文件并施加限制，需在 http(s) 环境下访问；
-           以本地文件方式直接打开时，浏览器会禁止该读取。</p>
-        <p>请直接打开 <a href="./快捷白板10.html">快捷白板10.html</a> 使用完整版。
-           完整版包含 AI 功能；如需录入 API Key，请自行评估并承担相应风险。</p>
-        <p>风险说明见 <a href="https://github.com/pythonWsr/ParkerEasiNote/blob/main/NOTICE" target="_blank" rel="noopener">NOTICE</a>。</p>
-      </div>
+<div id="app">
+    <div id="bg-layer" style="background-color:#0F261E;"></div>
+    <canvas id="drawing-board"></canvas>
+    <div id="eraser-cursor"></div>
+
+    <div id="top-right">
+        <span id="clock">--:--:--</span>
+        <span id="page-indicator">1/1</span>
     </div>
-  </div>
 
-<!-- 以下两段仅作为文本被读取并注入 iframe 副本，不会在本页面执行 -->
-<script type="text/plain" id="guard-css">
-#tool-ai,#ai-aura,#ai-loading,.ai-chat-overlay,.ai-menu{display:none!important}
-#set-api{display:none!important}
-</script>
+    <div id="bottom-toolbar" class="glass">
+        <div class="tool-indicator" id="tool-indicator"></div>
+        <button class="tool-btn active" id="tool-pen" data-tool="pen"><i class="fas fa-pen"></i><span>画笔</span></button>
+        <button class="tool-btn" id="tool-eraser" data-tool="eraser"><i class="fas fa-eraser"></i><span>橡皮</span></button>
+        <button class="tool-btn" id="tool-select" data-tool="select"><i class="fas fa-arrow-pointer"></i><span>选择</span></button>
+        <button class="tool-btn" id="tool-shape" data-tool="shape"><i class="fas fa-shapes"></i><span>形状</span></button>
+        <button class="tool-btn" id="tool-undo"><i class="fas fa-undo"></i><span>撤销</span></button>
+        <button class="tool-btn" id="tool-more" data-tool="more"><i class="fas fa-ellipsis-h"></i><span>更多</span></button>
+        <button class="tool-btn" id="tool-ai"><i class="fas fa-feather-alt"></i><span>AI总结</span></button>
+    </div>
 
-<script type="text/plain" id="guard-js">
-(function(){
-'use strict';
-/* 在线演示限制：禁用 API Key 与 AI 功能。原文件未被修改，限制仅作用于本内嵌副本。 */
-var BLOCK = /deepseek\.com/i;
-var MSG = '在线演示页面已禁用 API Key 与 AI 功能';
+    <div id="bottom-left">
+        <button class="left-fab glass" id="btn-menu" title="菜单"><i class="fas fa-bars"></i></button>
+        <button class="left-fab glass" id="btn-save" title="保存"><i class="fas fa-download"></i></button>
+        <button class="left-fab glass" id="btn-camera" title="视频展台"><i class="fas fa-camera"></i></button>
+        <button class="left-fab glass" id="btn-freeze" title="冻结画面"><i class="fas fa-snowflake"></i></button>
+    </div>
+    <div id="left-menu-panel">
+        <button class="menu-item" data-m="about"><i class="fas fa-info-circle"></i>关于</button>
+        <button class="menu-item" data-m="load"><i class="fas fa-folder-open"></i>加载文件</button>
+        <button class="menu-item" data-m="export"><i class="fas fa-file-export"></i>导出图片</button>
+        <button class="menu-item" data-m="prep"><i class="fas fa-archive"></i><span id="menu-prep-label">返回备课</span></button>
+        <button class="menu-item" data-m="ppt"><i class="fas fa-folder-open"></i>打开文件</button>
+        <button class="menu-item hidden" id="menu-exit-ppt" data-m="exit-ppt"><i class="fas fa-arrow-left"></i>返回白板</button>
+        <button class="menu-item" data-m="settings"><i class="fas fa-cog"></i>设置</button>
+        <button class="menu-item menu-exit" data-m="exit-app"><span class="exit-x"><i class="fas fa-times"></i></span><span>关闭白板并退出登录</span></button>
+    </div>
 
-/* 1. 拦截一切发往 AI 服务的请求 */
-try{
-    var origFetch = window.fetch;
-    if(typeof origFetch === 'function'){
-        window.fetch = function(input, init){
-            var url = '';
-            try{
-                if(typeof input === 'string') url = input;
-                else if(input && typeof input.href === 'string') url = input.href;
-                else if(input && typeof input.url === 'string') url = input.url;
-                else url = String(input || '');
-            }catch(e){}
-            if(BLOCK.test(url)) return Promise.reject(new Error(MSG));
-            return origFetch.apply(this, arguments);
-        };
-    }
-}catch(e){}
+    <div id="bottom-right" class="glass">
+        <button class="page-btn" id="btn-add-page" title="加页"><i class="fas fa-plus"></i></button>
+        <button class="page-btn" id="btn-prev-page" title="上一页"><i class="fas fa-chevron-left"></i></button>
+        <button class="page-btn" id="btn-next-page" title="下一页"><i class="fas fa-chevron-right"></i></button>
+        <button class="page-btn" id="btn-catalog" title="目录"><i class="fas fa-list"></i></button>
+    </div>
 
-/* 2. 禁止读写与持久化 API Key */
-try{
-    var gp = Storage.prototype.getItem, sp = Storage.prototype.setItem, rp = Storage.prototype.removeItem;
-    Storage.prototype.getItem = function(k){
-        return String(k) === 'easinote_api_key' ? null : gp.call(this, k);
-    };
-    Storage.prototype.setItem = function(k, v){
-        if(String(k) === 'easinote_api_key') return;
-        return sp.call(this, k, v);
-    };
-    Storage.prototype.removeItem = function(k){
-        if(String(k) === 'easinote_api_key'){
-            try{ return rp.call(this, k); }catch(e){ return; }
-        }
-        return rp.call(this, k);
-    };
-}catch(e){}
-try{ localStorage.removeItem('easinote_api_key'); }catch(e){}
-try{ sessionStorage.removeItem('easinote_api_key'); }catch(e){}
+    <div id="submenu" class="glass"></div>
 
-/* 3. 隐藏 AI / API 入口，含运行时动态生成的节点 */
-var SEL = '#tool-ai,#ai-aura,#ai-loading,.ai-chat-overlay,.ai-menu,#set-api,#api-suffix';
+    <div id="selection-bar">
+        <button class="sel-btn copy-btn" id="sel-copy"><i class="fas fa-copy"></i> 复制</button>
+        <button class="sel-btn ask-btn" id="sel-ask"><i class="fas fa-wand-magic-sparkles"></i> 问AI</button>
+        <button class="sel-btn cancel-btn" id="sel-cancel"><i class="fas fa-times"></i> 取消</button>
+    </div>
 
-function hide(el){
-    if(!el || el.nodeType !== 1) return;
-    if(el.id === 'set-api'){
-        var row = el.closest ? el.closest('.set-row') : null;
-        if(row){ row.style.display = 'none'; row.setAttribute('aria-hidden','true'); }
-    }
-    if(el.style.display !== 'none') el.style.display = 'none';
-    el.setAttribute('aria-hidden','true');
-}
-function purge(root){
-    if(!root || root.nodeType !== 1) return;
-    try{
-        if(root.matches && root.matches(SEL)) hide(root);
-        var list = root.querySelectorAll ? root.querySelectorAll(SEL) : [];
-        for(var i = 0; i < list.length; i++) hide(list[i]);
-    }catch(e){}
-}
-function boot(){
-    purge(document.body);
-    try{
-        new MutationObserver(function(records){
-            for(var i = 0; i < records.length; i++){
-                var added = records[i].addedNodes || [];
-                for(var j = 0; j < added.length; j++) purge(added[j]);
-            }
-        }).observe(document.body, { childList:true, subtree:true });
-    }catch(e){}
-    setInterval(function(){ purge(document.body); }, 1200);
-    try{ console.warn('[在线演示] ' + MSG + '；详见仓库 NOTICE。'); }catch(e){}
-}
-if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-else boot();
-})();
-</script>
+    <div id="ai-loading">
+        <div class="ai-loader-spinner"></div>
+        <span>正在总结...</span>
+        <button class="ai-stop-btn" id="btn-stop-ai"><i class="fas fa-stop"></i></button>
+    </div>
 
+    <div id="toast-container"></div>
+    <div id="narrow-warning"><i class="fas fa-exclamation-triangle"></i><span>屏幕偏窄，建议横屏使用</span></div>
+
+    <div id="zoom-confirm">
+        <div class="zc-body">
+            <div class="zc-title">确定应用此缩放？</div>
+            <div class="zc-sub">将在 <b class="zc-sec">10</b>s 后恢复原缩放</div>
+        </div>
+        <div class="zc-actions">
+            <button class="zc-btn zc-back" id="zc-back">恢复</button>
+            <button class="zc-btn zc-ok" id="zc-ok">确定应用</button>
+        </div>
+    </div>
+
+    <div id="big-time">
+        <div id="big-time-content">
+            <div id="big-time-val">00:00:00</div>
+            <div id="big-time-date"></div>
+        </div>
+    </div>
+
+    <div class="drawer-overlay" id="drawer-overlay"></div>
+    <div class="drawer" id="drawer">
+        <div class="drawer-head"><span>目录</span><button class="drawer-close" id="drawer-close"><i class="fas fa-times"></i></button></div>
+        <div class="drawer-body" id="drawer-body"></div>
+    </div>
+
+    <div id="modal-root"></div>
+
+    <div id="ai-aura">
+        <div class="aura-wash"></div>
+        <div class="aura-edge"></div>
+        <div class="aura-burst"></div>
+    </div>
+
+    <div id="present-layer">
+        <div class="present-stage" id="present-stage"></div>
+        <div class="present-hud">
+            <button id="present-prev" title="上一页"><i class="fas fa-chevron-left"></i></button>
+            <span id="present-ind">1 / 1</span>
+            <button id="present-next" title="下一页"><i class="fas fa-chevron-right"></i></button>
+            <button id="present-exit" title="退出放映"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
+
+    <!-- ===== 新增：Win8 磁贴面板 / 课堂工具 / 板中板 / 学科工具 挂载点 ===== -->
+    <div id="tiles-layer" aria-hidden="true"></div>
+    <div id="timer-fab" class="hidden"></div>
+    <div id="timer-layer" aria-hidden="true"></div>
+    <div id="bib-layer" aria-hidden="true"></div>
+    <div id="picker-layer" aria-hidden="true"></div>
+    <div id="subject-layer" aria-hidden="true"></div>
+
+    <input type="file" id="file-image" accept="image/*,.svg,.pdf,.txt,.md" style="display:none">
+    <input type="file" id="file-ppt" accept=".pptx,.docx,.pdf,.zip,.pnbx,.ppt,.doc" style="display:none">
+    <input type="file" id="file-any" accept="*/*" style="display:none">
+    <input type="file" id="file-prep-image" accept="image/*" style="display:none">
+</div>
+
+<script src="vendor/jszip.min.js"></script>
+<script src="vendor/pdf.min.js"></script>
 <script>
-(function(){
-'use strict';
-var APP_FILE = '快捷白板10.html';
-var loading = document.getElementById('loading');
-var fallback = document.getElementById('fallback');
-var frame = document.getElementById('app');
-
-function showFallback(){
-    if(loading) loading.style.display = 'none';
-    if(fallback) fallback.style.display = 'flex';
-}
-
-/* 把 guard-css / guard-js 注入到应用副本的 <head> 中（charset 声明之后），
-   保证先于应用自身脚本执行 */
-function injectGuards(html){
-    var css = document.getElementById('guard-css');
-    var js = document.getElementById('guard-js');
-    var block = '<style id="embed-guard-style">' + (css ? css.textContent : '') + '</style>' +
-                '<script id="embed-guard-js">' + (js ? js.textContent : '') + '<\/script>';
-    var m = /<meta[^>]+charset[^>]*>/i.exec(html) || /<head([^>]*)>/i.exec(html);
-    if(!m) return block + html;
-    return html.slice(0, m.index + m[0].length) + block + html.slice(m.index + m[0].length);
-}
-
-function load(){
-    if(!window.fetch || !('srcdoc' in frame)){ showFallback(); return; }
-    if(location.protocol === 'file:'){ showFallback(); return; }
-    fetch('./' + encodeURIComponent(APP_FILE), { cache:'no-cache' })
-        .then(function(r){
-            if(!r.ok) throw new Error('HTTP ' + r.status);
-            return r.text();
-        })
-        .then(function(html){
-            if(!html || html.indexOf('<html') === -1) throw new Error('bad html');
-            frame.addEventListener('load', function(){
-                if(loading) loading.style.display = 'none';
-            }, { once:true });
-            frame.srcdoc = injectGuards(html);
-        })
-        .catch(function(){ showFallback(); });
-}
-load();
-})();
+/* PDF.js 的 worker 也要走本地，离线打开 PDF 才不会卡住 */
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js";
 </script>
+<script src="vendor/three.min.js"></script>
+<script>
+window.MathJax = { tex:{ inlineMath:[['$','$'],['\\(','\\)']] }, svg:{ fontCache:'none' }, startup:{ typeset:false } };
+</script>
+<script src="vendor/mathjax-tex-svg.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/features/ppt-ext.js"></script>
+<script src="js/features/icons.js"></script>
+<script src="js/features/tiles.js"></script>
+<script src="js/features/timer.js"></script>
+<script src="js/features/board-in-board.js"></script>
+<script src="js/features/picker.js"></script>
+<script src="js/features/ai-cfg.js"></script>
+<script src="js/features/about.js"></script>
+<script src="js/features/update.js"></script>
+<script src="js/features/integrity.js"></script>
+<script src="js/features/video-stage.js"></script>
+<script src="js/features/tts.js"></script>
+<script src="js/features/subject-core.js"></script>
+<script src="js/features/subjects-lang.js"></script>
+<script src="js/features/subjects-math.js"></script>
+<script src="js/features/subjects-sci.js"></script>
+<script src="js/features/subjects-dict.js"></script>
+<script src="js/features/mindmap.js"></script>
 </body>
 </html>

@@ -29,3 +29,6 @@
 # 授权与声明文件
 /LICENSE @pythonWsr
 /NOTICE @pythonWsr
+
+# GitHub Pages 发布入口
+/web/index.html @pythonWsr

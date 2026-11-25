@@ -1,6 +1,5 @@
 {
-  "schema": 3,
-  "moved_to": "status",
-  "notice": "version.json 已迁移到 status 分支，由 pr.py release 维护。本文件仅用于兼容旧客户端。",
-  "release_url": "https://github.com/pythonWsr/ParkerEasiNote/releases/latest"
+  "version": "10.1.7",
+  "date": "2026-11-21",
+  "notes": "本版修复：几何画板网格只画一半/无法缩放平移；函数工具重建后失去交互；思维导图节点触摸拖动只动一点；工具抽屉无法滚动与调整参数；更多磁贴布局留白过大、行数自适应；窄屏提示恢复；PPT 公式/表格/图表/SmartArt 渲染；公式编辑器可直接编辑并可靠插入白板；退出改为真正关闭标签页。"
 }
