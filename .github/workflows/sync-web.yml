@@ -97,6 +97,7 @@ jobs:
       pages: write       # 写 Pages
       id-token: write    # OIDC token，deploy-pages 必需
       contents: read     # checkout 只读
+      actions: read      # 读取本 run 的 artifact 元数据（deploy-pages 必需）
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
