@@ -1,0 +1,87 @@
+# sync-web：把根目录的 10.1.7 源码单向同步到 web/src/（GitHub Pages 发布副本）
+#
+# 防循环三重保险：
+#   1. paths 不含 web/**（本 workflow 自己的 push 不会再次触发）
+#   2. commit message 带 [skip ci]
+#   3. if: 跳过 bot 账号触发的 push
+name: sync-web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'README.md'
+      - 'version.json'
+      - 'css/**'
+      - 'js/**'
+      - 'vendor/**'
+      - 'assets/**'
+      - 'data/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sync-web
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # 防循环：App 自己触发的 push 不再执行
+    if: ${{ !contains(github.actor, '[bot]') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 2
+
+      - uses: actions/create-github-app-token@v1
+        id: app
+        with:
+          app-id: ${{ secrets.PR_BOT_APP_ID }}
+          private-key: ${{ secrets.PR_BOT_PRIVATE_KEY }}
+
+      - name: 清掉 checkout 的 extraheader
+        run: |
+          git config --unset-all http.https://github.com/.extraheader || true
+
+      - name: 同步根目录到 web/src
+        run: |
+          set -e
+          for path in index.html README.md version.json css js vendor assets data; do
+            if [ -e "$path" ]; then
+              rm -rf "web/src/$path"
+              cp -r "$path" "web/src/$path"
+            fi
+          done
+
+      - name: 路径白名单检查（纵深防御）
+        run: |
+          set -e
+          CHANGED=$(git status --porcelain | awk '{print $2}')
+          if [ -z "$CHANGED" ]; then
+            echo "无改动，跳过"
+            exit 0
+          fi
+          echo "$CHANGED" | grep -v '^web/src/' && {
+            echo "错误：sync-web 只允许修改 web/src/**，检测到越界路径"
+            exit 1
+          } || true
+
+      - name: 提交并推送
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -e
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "无改动"
+            exit 0
+          fi
+          git config user.name "pr-bot[bot]"
+          git config user.email "pr-bot@users.noreply.github.com"
+          git add web/src/
+          git commit -m "chore(sync-web): 同步根目录到 web/src [skip ci]"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
+          git push origin HEAD:main
