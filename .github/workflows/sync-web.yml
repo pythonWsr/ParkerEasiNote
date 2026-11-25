@@ -18,6 +18,9 @@ on:
       - 'vendor/**'
       - 'assets/**'
       - 'data/**'
+      - 'web/index.html'                  # 壳变更需重新部署
+      - '.github/workflows/sync-web.yml'  # workflow 自身变更触发一次验证
+  workflow_dispatch:                    # 手动触发（重试/验证）
 
 permissions:
   contents: read
@@ -85,3 +88,29 @@ jobs:
           git commit -m "chore(sync-web): 同步根目录到 web/src [skip ci]"
           git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}"
           git push origin HEAD:main
+
+  deploy:
+    needs: sync
+    if: ${{ !cancelled() && needs.sync.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write       # 写 Pages
+      id-token: write    # OIDC token，deploy-pages 必需
+      contents: read     # checkout 只读
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    concurrency:
+      group: pages              # 防止两个 deploy 并发（与 sync 的 group: sync-web 独立）
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main             # 关键：拿 bot 刚 push 的最新 main
+          fetch-depth: 1
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web             # 打包 web/ 作为 artifact 根
+      - uses: actions/deploy-pages@v4
+        id: deployment
