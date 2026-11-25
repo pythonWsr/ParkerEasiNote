@@ -767,6 +767,15 @@ ParkerEasiNote10/
 
 ---
 
+## pr.py 与 prlib/ 的许可
+
+`pr.py`、`prlib/` 目录与 `docs/PR.md` 为 pythonWsr 独立编写的工具与文档，
+**不在本仓库 MIT 协议覆盖范围内**。Copyright (c) 2026 pythonWsr，保留所有权利。
+详见 `LICENSE-PRPY` 与 `NOTICE` 中对应章节。
+
+除上述内容外，本仓库其余内容仍按根目录 `LICENSE`（MIT License，
+Copyright (c) 2026 ParkerStudio）授权。
+
 ## 十二、致谢与许可
 
 ### 团队
