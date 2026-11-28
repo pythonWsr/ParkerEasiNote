@@ -98,15 +98,15 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
-      # IPA 只进 artifact（§27：协作者自行签名后再上传），其余上传到 draft Release
+      # Release 只放 apk/exe/ipa/dmg；html 单文件只进 artifact
       - name: 上传到 Release
-        if: ${{ inputs.tag != '' && matrix.key != 'ipa' && (inputs.platform == 'all' || inputs.platform == matrix.key) }}
+        if: ${{ inputs.tag != '' && matrix.key != 'html' && (inputs.platform == 'all' || inputs.platform == matrix.key) }}
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
         run: |
           set -euo pipefail
           gh release upload "${{ inputs.tag }}" dist/* -R "$GITHUB_REPOSITORY" --clobber
 
-      - name: IPA 说明
-        if: ${{ matrix.key == 'ipa' && (inputs.platform == 'all' || inputs.platform == 'ipa') }}
-        run: echo "::notice::IPA 已上传 artifact，未进 Release（§27，需协作者签名后手动 gh release upload）"
+      - name: HTML 说明
+        if: ${{ matrix.key == 'html' && (inputs.platform == 'all' || inputs.platform == 'html') }}
+        run: echo "::notice::HTML 单文件只上传 artifact，不进 Release"

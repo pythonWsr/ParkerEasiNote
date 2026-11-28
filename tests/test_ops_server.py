@@ -232,10 +232,10 @@ def test_release_writes_version_json_assets(tmp_path):
     assert version["schema"] == 3
     assert version["latest"] == "10.1.7"
     assert version["is_latest"] is True
-    for key in ("html", "exe", "apk", "dmg"):
+    for key in ("apk", "exe", "ipa", "dmg"):
         assert version["assets"][key]["version"] == "10.1.7"
         assert "releases/download/v10.1.7" in version["assets"][key]["url"]
-    assert version["assets"]["ipa"]["url"] == ""
+    assert "html" not in version["assets"]
 
 
 def test_merge_sets_pushed_and_records_sha(tmp_path):

@@ -272,14 +272,14 @@ def apply_op(
         version["is_latest"] = bool(payload.get("latest", True))
         version["release_url"] = "https://github.com/%s/releases/tag/%s" % (repo, tag)
         assets = version.setdefault("assets", {})
-        for key in ("html", "exe", "apk", "dmg"):
+        for key in ("apk", "exe", "ipa", "dmg"):
             assets[key] = {
                 "version": number,
                 "url": "%s/ParkerEasiNote-%s.%s" % (base, number, key),
                 "size": 0,
                 "sha256": "",
             }
-        assets.setdefault("ipa", {"version": number, "url": "", "size": 0, "sha256": ""})
+        assets.pop("html", None)
         _write(status_dir, "version.json", version)
         return {"ok": True, "op": op, "data": {"version": number, "tag": tag}}
 

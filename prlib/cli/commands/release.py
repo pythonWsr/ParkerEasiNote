@@ -6,6 +6,7 @@ IPA 只进 artifact（§27），由协作者签名后手动上传。
 
 from __future__ import annotations
 
+import os
 import re
 import time
 
@@ -64,6 +65,13 @@ def run(ctx: Context, args) -> int:
 
     ctx.gh.edit_release(tag, draft=False)
     data = ctx.apply("release", {"version": version, "tag": tag, "latest": not args.no_latest})
+
+    os.makedirs("out", exist_ok=True)
+    ctx.gh.download_release_assets(tag, "out")
+    ctx.output.warn(
+        "Release 已发布，产物在 out/；本地同步 Gitee 可用：\n"
+        "  GITEE_TOKEN=<token> python3 tools/gitee_release.py %s" % tag
+    )
     ctx.output.success(
         "release",
         {"version": version, "tag": tag, "published": True, "run_id": run_id, "result": data},

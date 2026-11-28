@@ -328,6 +328,12 @@ class Gh:
             return
         self._gh(args)
 
+    def download_release_assets(self, tag: str, dest: str, dry_run: bool = False) -> None:
+        if dry_run:
+            self.last_plan = ["release", "download", tag, "--dir", dest, "--clobber"]
+            return
+        self._gh(["release", "download", tag, "--dir", dest, "--clobber"])
+
     def pr_view(self, number: int) -> dict:
         data = self._json([
             "pr", "view", str(number),
