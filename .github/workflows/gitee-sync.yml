@@ -121,11 +121,11 @@ jobs:
           gh release view "$TAG" --json body --jq .body > notes.md
 
           # 已存在则复用，否则创建
-          RESP=$(curl -sS "$API/releases/tags/$TAG?access_token=$TOKEN" || true)
+          RESP=$(curl -sS --max-time 60 "$API/releases/tags/$TAG?access_token=$TOKEN" || true)
           ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("id") or "")' 2>/dev/null || true)
 
           if [ -z "$ID" ]; then
-            RESP=$(curl -sS -X POST "$API/releases" \
+            RESP=$(curl -sS --max-time 120 -X POST "$API/releases" \
               --data-urlencode "access_token=$TOKEN" \
               --data-urlencode "tag_name=$TAG" \
               --data-urlencode "name=$NAME" \
@@ -141,10 +141,26 @@ jobs:
           fi
           echo "Gitee Release id=$ID"
 
+          EXISTING=$(curl -sS --max-time 60 "$API/releases/$ID?access_token=$TOKEN" \
+            | python3 -c 'import json,sys;print(" ".join(a.get("name","") for a in (json.load(sys.stdin).get("assets") or [])))' \
+            2>/dev/null || true)
+
           for f in dist/*; do
             [ -f "$f" ] || continue
-            curl -sS -X POST "$API/releases/$ID/attach_files" \
+            BASE=$(basename "$f")
+            case " $EXISTING " in
+              *" $BASE "*) echo "已存在，跳过 $BASE"; continue ;;
+            esac
+            CODE=$(curl -sS --max-time 900 --retry 3 --retry-delay 5 \
+              -o /tmp/gitee-attach.out -w '%{http_code}' \
+              -X POST "$API/releases/$ID/attach_files" \
               -F "access_token=$TOKEN" \
-              -F "file=@$f" >/dev/null
-            echo "已上传 $(basename "$f")"
+              -F "file=@$f" || echo "000")
+            if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+              echo "已上传 $BASE (HTTP $CODE)"
+            else
+              echo "::error::上传 $BASE 失败 HTTP $CODE"
+              cat /tmp/gitee-attach.out || true
+              exit 1
+            fi
           done
