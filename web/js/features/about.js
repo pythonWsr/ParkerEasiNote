@@ -18,8 +18,8 @@
 
     var content =
       '<div class="about-wrap">' +
-        '<div class="aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span>' +
-          '<span class="a4"></span><span class="a5"></span></div>' +
+        '<div class="glow" aria-hidden="true"><span class="g1"></span><span class="g2"></span><span class="g3"></span>' +
+          '<span class="g4"></span><span class="g5"></span></div>' +
         '<div class="about-scroll">' +
           '<div class="about-logo-row">' +
             '<img class="about-logo" src="assets/img/logo.png" alt="ParkerEasiNote10">' +

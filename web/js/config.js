@@ -6,9 +6,9 @@ window.EN10_CONFIG = {
   name: 'ParkerEasiNote10',
   shortName: 'ParkerEasiNote',
   cnName: '快捷白板',
-  version: '10.1.7',
-  kernel: '10.1.5',
-  build: '2026.11.21',
+  version: '10.2.7',
+  kernel: '10.2.7',
+  build: '2026.11.28',
   slogan: '让板书成为画面里唯一的主角',
   /* 关于页按钮 */
   website: 'https://parkerstudioxkissice.app.workbuddy.host/?sharecode=UZYO5WR4L6',
