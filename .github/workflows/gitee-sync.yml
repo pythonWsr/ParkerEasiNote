@@ -122,11 +122,7 @@ jobs:
 
           # 已存在则复用，否则创建
           RESP=$(curl -sS "$API/releases/tags/$TAG?access_token=$TOKEN" || true)
-          ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("id") or "")
-except Exception:
-    print("")' 2>/dev/null || true)
+          ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("id") or "")' 2>/dev/null || true)
 
           if [ -z "$ID" ]; then
             RESP=$(curl -sS -X POST "$API/releases" \
@@ -136,11 +132,7 @@ except Exception:
               --data-urlencode "body@notes.md" \
               --data-urlencode "target_commitish=main" \
               --data-urlencode "prerelease=false")
-            ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys
-try:
-    print(json.load(sys.stdin).get("id") or "")
-except Exception:
-    print("")' 2>/dev/null || true)
+            ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("id") or "")' 2>/dev/null || true)
           fi
 
           if [ -z "$ID" ]; then
