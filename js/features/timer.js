@@ -40,7 +40,8 @@
     fab = document.getElementById('timer-fab');
     layer = document.getElementById('timer-layer');
     /* 先藏在顶栏，等真正用过计时器再常驻显示 */
-    fab.innerHTML = '<i class="fas fa-stopwatch"></i><span class="tval">--:--</span>';
+    fab.innerHTML = '<i class="fas fa-stopwatch"></i><span class="tval">--:--</span>' +
+      '<span class="t-x" id="t-hide-fab" role="button" title="收起计时器"><i class="fas fa-times"></i></span>';
     layer.innerHTML =
       '<div class="timer-scrim"></div>' +
       '<div class="timer-panel">' +
@@ -51,6 +52,7 @@
         '<div class="timer-actions">' +
           '<button class="t-reset" id="t-reset" title="重置"><i class="fas fa-rotate-left"></i></button>' +
           '<button class="t-start" id="t-start">开始</button>' +
+          '<button class="t-hide" id="t-hide" title="收起计时器"><i class="fas fa-chevron-up"></i></button>' +
           '<button class="t-full" id="t-full" title="全屏投影"><i class="fas fa-expand"></i></button>' +
         '</div>' +
       '</div>';
@@ -69,7 +71,10 @@
     document.body.appendChild(big);
 
     fab.onclick = function(e){ e.stopPropagation(); togglePanel(); };
+    var hideFabBtn = fab.querySelector('#t-hide-fab');
+    if(hideFabBtn) hideFabBtn.onclick = function(e){ e.stopPropagation(); hideTimer(); };
     layer.querySelector('.timer-scrim').onclick = function(){ closePanel(); };
+    layer.querySelector('#t-hide').onclick = function(){ hideTimer(); };
     layer.querySelectorAll('.timer-seg button').forEach(function(b){
       b.onclick = function(){
         if(st.mode === b.dataset.mode) return;
@@ -141,6 +146,20 @@
   function closePanel(){
     st.opened = false;
     layer.classList.remove('on');
+  }
+  /* 收起：把顶部胶囊彻底藏起来；正在走的时间先暂停，下次打开不会“莫名少了几分钟” */
+  function hideTimer(){
+    st.opened = false;
+    layer.classList.remove('on');
+    if(st.running){
+      st.elapsed = nowElapsed();
+      st.baseElapsed = st.elapsed;
+      st.running = false;
+    }
+    fab.classList.add('hidden');
+    if(big) big.classList.remove('on');
+    update();
+    EN10.toast('计时器已收起，可在「更多 → 计时器」重新打开', 'fa-stopwatch');
   }
 
   function toggleRun(){
@@ -259,9 +278,10 @@
   }
 
   window.EN10Timer = {
-    open: function(){ init(); if(!st.opened){ st.opened = true; layer.classList.add('on'); } update(); },
-    start: function(sec){ init(); st.mode = 'down'; st.total = sec || 300; resetTimer(); toggleRun(); },
-    fullscreen: function(){ init(); big.classList.add('on'); },
+    open: function(){ init(); fab.classList.remove('hidden'); if(!st.opened){ st.opened = true; layer.classList.add('on'); } update(); },
+    start: function(sec){ init(); fab.classList.remove('hidden'); st.mode = 'down'; st.total = sec || 300; resetTimer(); toggleRun(); },
+    fullscreen: function(){ init(); fab.classList.remove('hidden'); big.classList.add('on'); },
+    hide: function(){ init(); hideTimer(); },
     isRunning: function(){ return st.running; }
   };
 

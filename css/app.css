@@ -25,10 +25,9 @@ html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#
 #bg-layer{position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;display:flex;align-items:center;justify-content:center;overflow:hidden;background-color:transparent;transition:background .3s}
 #bg-layer video{width:100%;height:100%;object-fit:contain;display:block}
 #bg-layer .freeze-frame{width:100%;height:100%;object-fit:contain;display:block}
-#btn-freeze{display:none}
-body.camera-mode #btn-freeze{display:flex}
-#btn-freeze.on{background:#ff9500;color:#fff}
-#btn-freeze.on i{animation:none}
+#btn-shot{display:none}
+body.camera-mode #btn-shot{display:flex}
+#btn-shot:active{transform:scale(.92)}
 #bg-layer .ppt-viewport{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;background:#fff;background-position:center;background-repeat:no-repeat;background-size:contain;}
 #bg-layer .ppt-stage{position:absolute;top:50%;left:50%;transform-origin:center center;overflow:hidden;box-shadow:0 2px 20px rgba(0,0,0,0.6);background:#fff;background-position:center;background-repeat:no-repeat;background-size:100% 100%;}
 #bg-layer .ppt-stage .shape { position:absolute; overflow:hidden; box-sizing:border-box; display:none; }
@@ -351,13 +350,14 @@ body.camera-mode #btn-freeze{display:flex}
 .ai-stop-btn{background:#ff3b30;color:#fff;border:none;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .2s;font-size:12px}
 .ai-stop-btn:active{transform:scale(.9)}
 
-/* ===== PPT 放映 UI 缩小自适应 ===== */
-body.ppt-mode #bottom-left, body.ppt-mode #bottom-right, body.ppt-mode #top-right { transform: scale(0.5) !important; }
-body.ppt-mode #bottom-toolbar { transform: translateX(-50%) scale(0.5) !important; transform-origin: bottom center; will-change: transform; }
-body.ppt-mode #bottom-left { transform-origin: bottom left; }
-body.ppt-mode #bottom-right { transform-origin: bottom right; }
+/* ===== PPT 放映 UI 缩小自适应（只缩右上角，底栏保持原尺寸） ===== */
+body.ppt-mode #top-right { transform: scale(0.5) !important; }
 body.ppt-mode #top-right { transform-origin: top right; }
-body.ppt-mode #tool-select, body.ppt-mode #tool-more, body.ppt-mode #tool-ai, body.ppt-mode #btn-camera { opacity: 0 !important; width: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none !important; overflow: hidden !important; }
+body.ppt-mode #tool-more, body.ppt-mode #tool-ai, body.ppt-mode #btn-camera { opacity: 0 !important; width: 0 !important; padding: 0 !important; margin: 0 !important; pointer-events: none !important; overflow: hidden !important; }
+/* 放映时「选择」用来点音频/视频：显示出来，并让画布不拦截点击 */
+body.ppt-mode #tool-select{opacity:1!important;width:auto!important;padding:0 8px!important;margin:0 2px!important;
+  pointer-events:auto!important;overflow:visible!important}
+body.ppt-mode.tool-select-mode #drawing-board{pointer-events:none}
 
 /* ===== 内嵌网页 / 实验窗口 ===== */
 .embed-modal{max-width:94vw!important;max-height:90vh!important;width:94vw!important}
@@ -543,13 +543,11 @@ body.prep-annotate .prep-order-chip{display:none!important}
 .md-body a{color:#128a4c;text-decoration:underline}
 .md-body .md-hr-soft{height:1px;background:linear-gradient(90deg,transparent,#dfe6ec,transparent);margin:14px 0;border:0}
 
-/* ===== 打开的文件 / 备课 时底栏缩小 ===== */
-body.ppt-mode #bottom-left, body.ppt-mode #bottom-right, body.ppt-mode #top-right,
+/* ===== 打开的文件 / 备课 时底栏缩小（PPT 放映保持正常大小） ===== */
 body.doc-mode #bottom-left, body.doc-mode #bottom-right, body.doc-mode #top-right { transform: scale(0.5) !important; }
-body.ppt-mode #bottom-toolbar,
 body.doc-mode #bottom-toolbar { transform: translateX(-50%) scale(0.5) !important; transform-origin: bottom center; will-change: transform; }
-body.ppt-mode #bottom-left, body.doc-mode #bottom-left { transform-origin: bottom left; }
-body.ppt-mode #bottom-right, body.doc-mode #bottom-right { transform-origin: bottom right; }
-body.ppt-mode #top-right, body.doc-mode #top-right { transform-origin: top right; }
+body.doc-mode #bottom-left { transform-origin: bottom left; }
+body.doc-mode #bottom-right { transform-origin: bottom right; }
+body.doc-mode #top-right { transform-origin: top right; }
 body.selecting #drawing-board{cursor:default}
 .hidden{display:none!important}

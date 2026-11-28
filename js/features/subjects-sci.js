@@ -12,15 +12,15 @@
     { eq:'Fe + O2 -> Fe3O4', note:'铁丝在氧气中燃烧，火星四射，生成黑色固体（集气瓶底需留少量水）。' },
     { eq:'Mg + O2 -> MgO', note:'镁条燃烧，发出耀眼白光，生成白色固体。' },
     { eq:'P + O2 -> P2O5', note:'红磷燃烧产生大量白烟，可用于测定空气中氧气含量。' },
-    { eq:'H2O -> H2 + O2', note:'电解水：正极产生氧气，负极产生氢气，体积比约 1:2。' },
-    { eq:'KClO3 -> KCl + O2', note:'加热氯酸钾（二氧化锰催化）制氧气。' },
-    { eq:'KMnO4 -> K2MnO4 + MnO2 + O2', note:'加热高锰酸钾制氧气，试管口略向下倾斜。' },
-    { eq:'CaCO3 -> CaO + CO2', note:'高温煅烧石灰石，工业制生石灰。' },
-    { eq:'CO2 + Ca(OH)2 -> CaCO3 + H2O', note:'澄清石灰水变浑浊，用于检验二氧化碳。' },
+    { eq:'H2O -> H2↑ + O2↑', note:'电解水：正极产生氧气，负极产生氢气，体积比约 1:2。' },
+    { eq:'KClO3 -> KCl + O2↑', note:'加热氯酸钾（二氧化锰催化）制氧气。' },
+    { eq:'KMnO4 -> K2MnO4 + MnO2 + O2↑', note:'加热高锰酸钾制氧气，试管口略向下倾斜。' },
+    { eq:'CaCO3 -> CaO + CO2↑', note:'高温煅烧石灰石，工业制生石灰。' },
+    { eq:'CO2 + Ca(OH)2 -> CaCO3↓ + H2O', note:'澄清石灰水变浑浊，用于检验二氧化碳。' },
     { eq:'CO + Fe2O3 -> Fe + CO2', note:'一氧化碳还原氧化铁，红棕色粉末变黑，尾气需处理。' },
-    { eq:'Zn + HCl -> ZnCl2 + H2', note:'锌与稀盐酸反应，产生气泡，实验室制氢气。' },
+    { eq:'Zn + HCl -> ZnCl2 + H2↑', note:'锌与稀盐酸反应，产生气泡，实验室制氢气。' },
     { eq:'NaOH + HCl -> NaCl + H2O', note:'中和反应，放热，酚酞由红变无色。' },
-    { eq:'Na2CO3 + HCl -> NaCl + H2O + CO2', note:'产生大量气泡，可用于检验碳酸盐。' },
+    { eq:'Na2CO3 + HCl -> NaCl + H2O + CO2↑', note:'产生大量气泡，可用于检验碳酸盐。' },
     { eq:'Fe + CuSO4 -> FeSO4 + Cu', note:'铁钉表面析出红色铜，溶液由蓝色变浅绿色。' },
     { eq:'CH4 + O2 -> CO2 + H2O', note:'甲烷（天然气）燃烧，淡蓝色火焰。' },
     { eq:'C2H5OH + O2 -> CO2 + H2O', note:'乙醇燃烧，放出大量热，可作燃料。' },
@@ -74,13 +74,18 @@
   function splitSide(side){
     return side.split('+').map(function(s){ return s.trim(); }).filter(Boolean);
   }
+  /* ↑ 气体 / ↓ 沉淀：允许直接写在化学式后面，配平时先摘掉再算原子数 */
+  function takeMark(f){ var m = /([↑↓])\s*$/.exec(f); return m ? m[1] : ''; }
+  function stripMark(f){ return f.replace(/[↑↓]\s*$/, ''); }
 
   function balance(eq){
     var norm = eq.replace(/[=＝]/g, '->').replace(/→|—>|⟶/g, '->');
     var parts = norm.split('->');
     if(parts.length !== 2) throw new Error('请用 -> 或 = 分隔反应物与生成物');
-    var left = splitSide(parts[0]), right = splitSide(parts[1]);
+    var leftRaw = splitSide(parts[0]), rightRaw = splitSide(parts[1]);
+    var left = leftRaw.map(stripMark), right = rightRaw.map(stripMark);
     if(!left.length || !right.length) throw new Error('方程式不完整');
+    var marks = leftRaw.map(takeMark).concat(rightRaw.map(takeMark));
     var species = left.concat(right);
     var counts = species.map(function(f){ return parseFormula(f.replace(/^\d+/, '')); });
     var atoms = {};
@@ -132,15 +137,22 @@
     if(neg) ints = ints.map(function(v){ return -v; });
     if(ints.some(function(v){ return v <= 0; })) throw new Error('配平失败，请检查化学式');
     return {
-      left: left.map(function(f, i){ return { f:f.replace(/^\d+/, ''), k:ints[i] }; }),
-      right: right.map(function(f, i){ return { f:f.replace(/^\d+/, ''), k:ints[left.length + i] }; }),
+      left: left.map(function(f, i){ return { f:f.replace(/^\d+/, ''), k:ints[i], m:marks[i] }; }),
+      right: right.map(function(f, i){ return { f:f.replace(/^\d+/, ''), k:ints[left.length + i], m:marks[left.length + i] }; }),
       ints: ints
     };
   }
 
-  /* 化学式 → 带下标的 HTML */
-  function pretty(f){
-    return esc(f).replace(/([A-Za-z\)\]])(\d+)/g, '$1<sub>$2</sub>').replace(/·/g, '·');
+  /* 化学式 → 带下标与 ↑/↓ 的 HTML */
+  function pretty(f, mark){
+    var mk = mark || '';
+    f = String(f || '');
+    if(!mk){
+      var mm = /([↑↓])\s*$/.exec(f);
+      if(mm){ mk = mm[1]; f = f.slice(0, mm.index); }
+    }
+    return esc(f).replace(/([A-Za-z\)\]])(\d+)/g, '$1<sub>$2</sub>').replace(/·/g, '·') +
+      (mk ? '<sup class="chem-mark">' + mk + '</sup>' : '');
   }
 
   S.chem = function(){
@@ -162,8 +174,8 @@
       hint:'支持括号、结晶水与有机物的完整配平；点左侧方程式可一键载入。',
       insert:{ label:'插入方程式', get:function(api){
         if(!res){ EN10.toast('先配平一个方程式', 'fa-exclamation-triangle'); return false; }
-        var text = res.left.map(function(x){ return (x.k > 1 ? x.k : '') + x.f; }).join(' + ') + ' → ' +
-                   res.right.map(function(x){ return (x.k > 1 ? x.k : '') + x.f; }).join(' + ');
+        var text = res.left.map(function(x){ return (x.k > 1 ? x.k : '') + x.f + (x.m || ''); }).join(' + ') + ' → ' +
+                   res.right.map(function(x){ return (x.k > 1 ? x.k : '') + x.f + (x.m || ''); }).join(' + ');
         var cv = drawEq(text);
         api.insertCanvas(cv, 1);
       }},
@@ -182,6 +194,29 @@
             run(true);
           };
         });
+        function renderResult(idx){
+          if(!res) return;
+          function side(arr, tag){
+            return arr.map(function(x, i){
+              return '<span class="chem-sp" data-side="' + tag + '" data-i="' + i + '" title="点击切换 ↑ / ↓ 标注">' +
+                (x.k > 1 ? '<b>' + x.k + '</b>' : '') + pretty(x.f, x.m) + '</span>';
+            }).join(' + ');
+          }
+          out.innerHTML =
+            '<div class="chem-eq">' + side(res.left, 'l') + ' &nbsp;⟶&nbsp; ' + side(res.right, 'r') + '</div>' +
+            '<div style="text-align:center;font-size:11px;color:#96A1AC;letter-spacing:1px">已配平 · 点化学式可加 ↑ 气体 / ↓ 沉淀</div>' +
+            (idx > -1 ? '<div class="poem-note" style="margin-top:16px"><b>现象：</b>' + esc(BANK[idx].note) + '</div>' : '') +
+            '<div class="poem-note" style="margin-top:10px"><b>系数比：</b>' + res.ints.join(' : ') + '</div>';
+          out.querySelectorAll('.chem-sp').forEach(function(el){
+            el.onclick = function(){
+              var arr = el.getAttribute('data-side') === 'l' ? res.left : res.right;
+              var it = arr[+el.getAttribute('data-i')];
+              if(!it) return;
+              it.m = it.m === '↑' ? '↓' : (it.m === '↓' ? '' : '↑');
+              renderResult(idx);
+            };
+          });
+        }
         function run(fromBank){
           var eq = input.value.trim();
           if(!eq){ EN10.toast('先输入方程式', 'fa-pencil'); return; }
@@ -189,13 +224,7 @@
           BANK.forEach(function(b, i){ if(b.eq.replace(/\s/g, '') === eq.replace(/\s/g, '')) idx = i; });
           try{
             res = balance(eq);
-            var l = res.left.map(function(x){ return (x.k > 1 ? '<b>' + x.k + '</b>' : '') + pretty(x.f); }).join(' + ');
-            var rr = res.right.map(function(x){ return (x.k > 1 ? '<b>' + x.k + '</b>' : '') + pretty(x.f); }).join(' + ');
-            out.innerHTML =
-              '<div class="chem-eq">' + l + ' &nbsp;⟶&nbsp; ' + rr + '</div>' +
-              '<div style="text-align:center;font-size:11px;color:#96A1AC;letter-spacing:1px">已配平</div>' +
-              (idx > -1 ? '<div class="poem-note" style="margin-top:18px"><b>现象：</b>' + esc(BANK[idx].note) + '</div>' : '') +
-              '<div class="poem-note" style="margin-top:' + (idx > -1 ? '10px' : '18px') + '"><b>系数比：</b>' + res.ints.join(' : ') + '</div>';
+            renderResult(idx);
           }catch(e){
             res = null;
             out.innerHTML = '<div class="panel-empty" style="height:auto;padding:30px 0;color:#C0392B">' + esc(e.message) + '<br><span style="color:#96A1AC">例：Fe + O2 -> Fe3O4</span></div>';
@@ -221,9 +250,14 @@
       for(var i = 0; i < text.length; i++){
         var ch = text[i];
         var isSub = /\d/.test(ch) && i > 0 && /[A-Za-z\)\]]/.test(text[i - 1]);
+        var isMark = ch === '↑' || ch === '↓';
         var label = ch === '->' ? '→' : ch;
         if(ch === '-' && text[i + 1] === '>'){ label = '→'; i++; }
-        if(isSub){
+        if(isMark){
+          c.font = '700 26px "PingFang SC",sans-serif';
+          c.fillText(ch, x + 2, base - 24);
+          x += c.measureText(ch).width + 4;
+        } else if(isSub){
           c.font = '600 24px "PingFang SC",sans-serif';
           c.fillText(ch, x, base + 10);
           x += c.measureText(ch).width + 1;
@@ -375,8 +409,9 @@
     });
     cv.addEventListener('pointermove', function(e){
       if(!drag) return;
-      target.y = drag.ry + (e.clientX - drag.x) * .006;
-      target.x = Math.max(-1.35, Math.min(1.35, drag.rx + (e.clientY - drag.y) * .005));
+      /* 跟手：向右拖 → 画面向右转；向下拖 → 画面向下转 */
+      target.y = drag.ry - (e.clientX - drag.x) * .006;
+      target.x = Math.max(-1.3, Math.min(1.3, drag.rx + (e.clientY - drag.y) * .005));
     });
     function up(e){ drag = null; cv.style.cursor = 'grab'; try{ cv.releasePointerCapture(e.pointerId); }catch(err){} }
     cv.addEventListener('pointerup', up);
@@ -597,8 +632,12 @@
         var ptrs = new Map();
         var dom = renderer.domElement;
         dom.style.touchAction = 'none';
+        dom.style.cursor = 'grab';
         dom.addEventListener('pointerdown', function(e){
-          dom.setPointerCapture(e.pointerId);
+          if(e.button !== undefined && e.button !== 0) return;
+          e.preventDefault();
+          try{ dom.setPointerCapture(e.pointerId); }catch(err){}
+          dom.style.cursor = 'grabbing';
           ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
           if(ptrs.size === 1){
             drag = { x:e.clientX, y:e.clientY, rx:targetRot.x, ry:targetRot.y };
@@ -613,24 +652,38 @@
           if(!ptrs.has(e.pointerId)) return;
           ptrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
           if(ptrs.size === 1 && drag){
-            targetRot.y = drag.ry + (e.clientX - drag.x) * .006;
-            targetRot.x = Math.max(-1.35, Math.min(1.35, drag.rx + (e.clientY - drag.y) * .005));
+            /* 抓住球体拖动：横拖横转、纵拖纵转，方向跟手指一致 */
+            targetRot.y = drag.ry - (e.clientX - drag.x) * .005;
+            targetRot.x = Math.max(-1.3, Math.min(1.3, drag.rx + (e.clientY - drag.y) * .0045));
           } else if(ptrs.size === 2){
             var arr = Array.from(ptrs.values());
             var d = Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
-            if(pinchDist) targetDist = Math.max(8, Math.min(160, pinchStart * (pinchDist / d)));
+            /* 双指张开 = 拉近，间距比例直接映射到相机距离 */
+            if(pinchDist) targetDist = Math.max(10, Math.min(170, pinchStart * (pinchDist / d)));
           }
         });
         function up(e){
           ptrs.delete(e.pointerId);
-          if(ptrs.size === 0){ drag = null; pinchDist = 0; }
+          if(ptrs.size === 0){ drag = null; pinchDist = 0; dom.style.cursor = 'grab'; }
+          else if(ptrs.size === 1){
+            var only = Array.from(ptrs.values())[0];
+            drag = { x:only.x, y:only.y, rx:targetRot.x, ry:targetRot.y };
+            pinchDist = 0;
+          }
+          try{ dom.releasePointerCapture(e.pointerId); }catch(err){}
         }
         dom.addEventListener('pointerup', up);
         dom.addEventListener('pointercancel', up);
         dom.addEventListener('wheel', function(e){
           e.preventDefault();
-          targetDist = Math.max(8, Math.min(180, targetDist * (e.deltaY > 0 ? 1.1 : 1 / 1.1)));
+          var f = e.deltaY > 0 ? 1.08 : 1 / 1.08;
+          targetDist = Math.max(10, Math.min(190, targetDist * f));
         }, { passive:false });
+        /* 双击回到全景视角，避免转晕后找不到北 */
+        dom.addEventListener('dblclick', function(){
+          targetRot = { x:.35, y:.6 };
+          targetDist = focus < 0 ? 78 : targetDist;
+        });
 
         function resize(){
           var w = stage.clientWidth || W, h = stage.clientHeight || H;
@@ -649,11 +702,12 @@
           rot.x += (targetRot.x - rot.x) * .12;
           rot.y += (targetRot.y - rot.y) * .12;
           dist += (targetDist - dist) * .1;
-          var cy = dist, cz = dist * .0;
+          /* 球面相机：rot.x = 仰角，rot.y = 方位角；不再额外加高度偏移，旋转中心才是太阳 */
+          var ce = Math.cos(rot.x), se = Math.sin(rot.x);
           camera.position.set(
-            Math.sin(rot.y) * Math.cos(rot.x) * dist,
-            Math.sin(rot.x) * dist + 8,
-            Math.cos(rot.y) * Math.cos(rot.x) * dist
+            Math.sin(rot.y) * ce * dist,
+            se * dist,
+            Math.cos(rot.y) * ce * dist
           );
           camera.lookAt(0, 0, 0);
           if(!paused){

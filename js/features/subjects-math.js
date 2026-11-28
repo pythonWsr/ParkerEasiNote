@@ -618,16 +618,16 @@
         { t:'\\therefore', l:'∴', k:'∴' }
       ]},
       { l:'结构', items:[
-        { t:'\\sqrt[n]{x}', l:'n 次根' },
-        { t:'\\sum_{i=1}^{n}', l:'求和' },
-        { t:'\\int_{a}^{b}', l:'积分' },
-        { t:'\\lim_{x \\to 0}', l:'极限' },
-        { t:'\\begin{cases} a \\\\ b \\end{cases}', l:'分段' },
-        { t:'\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', l:'矩阵' },
-        { t:'\\vec{a}', l:'向量' },
-        { t:'\\bar{x}', l:'平均' },
-        { t:'\\overline{AB}', l:'线段' },
-        { t:'\\alpha \\beta \\gamma', l:'希腊' }
+        { t:'\\sqrt[n]{x}', l:'n 次根', k:'ⁿ√x' },
+        { t:'\\sum_{i=1}^{n}', l:'求和', k:'∑' },
+        { t:'\\int_{a}^{b}', l:'积分', k:'∫' },
+        { t:'\\lim_{x \\to 0}', l:'极限', k:'lim' },
+        { t:'\\begin{cases} a \\\\ b \\end{cases}', l:'分段', k:'{ 分段' },
+        { t:'\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}', l:'矩阵', k:'▦' },
+        { t:'\\vec{a}', l:'向量', k:'→a' },
+        { t:'\\bar{x}', l:'平均', k:'x̄' },
+        { t:'\\overline{AB}', l:'线段', k:'AB' },
+        { t:'\\alpha \\beta \\gamma', l:'希腊', k:'αβγ' }
       ]}
     ];
     var TPL = [

@@ -74,6 +74,7 @@
                 '<span class="pk-face-count"><i class="fas fa-users"></i> 检测到 <b id="pk-face-n">0</b> 人</span>' +
                 '<button class="p-btn start" id="pk-cam-start"><i class="fas fa-dice"></i> 抽取一人</button>' +
                 '<button class="p-btn reset" id="pk-cam-reset">重选</button>' +
+                '<button class="p-btn reset" id="pk-cam-switch" title="切换摄像头"><i class="fas fa-camera-rotate"></i> 切换</button>' +
               '</div>' +
               '<div class="pk-cam-result" id="pk-cam-result"></div>' +
             '</div>' +
@@ -113,6 +114,7 @@
     });
     layer.querySelector('#pk-cam-start').onclick = camStart;
     layer.querySelector('#pk-cam-reset').onclick = camReset;
+    layer.querySelector('#pk-cam-switch').onclick = switchCamera;
     layer.querySelector('#pk-reset').onclick = reset;
     document.addEventListener('keydown', function(e){
       if(!open) return;
@@ -122,7 +124,7 @@
   }
 
   /* ===================== 摄像头抽取 ===================== */
-  var cam = { stream:null, raf:0, faces:[], picked:-1, ready:false, rolling:false, timer:0, loading:false, waiting:[] };
+  var cam = { stream:null, raf:0, faces:[], picked:-1, ready:false, rolling:false, timer:0, loading:false, waiting:[], deviceId:'' };
 
   function setTab(tab){
     layer.querySelectorAll('#pk-tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.tab === tab); });
@@ -162,6 +164,61 @@
       if(usable()) cb(); else cpu();
     }).catch(cpu);
   }
+  /* 人脸模型内联包：双击 file:// 打开时 fetch 本地 json/bin 会被判 CORS，
+     这里提前把 manifest 与权重读成内存对象，再做一个只拦截模型文件的 fetch 垫片。 */
+  function base64ToBytes(b64){
+    var bin = atob(b64), n = bin.length, out = new Uint8Array(n);
+    for(var i = 0; i < n; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  function ensureInlineModel(cb){
+    if(window.EN10_FACE_MODEL){ cb(true); return; }
+    var s = document.createElement('script');
+    s.src = 'vendor/faceapi/model-inline.js';
+    s.onload = function(){ cb(!!window.EN10_FACE_MODEL); };
+    s.onerror = function(){ cb(false); };
+    document.head.appendChild(s);
+  }
+  function installFaceFetchShim(){
+    if(window.__EN10FaceFetchShim || typeof window.fetch !== 'function') return;
+    var rawFetch = window.fetch;
+    window.fetch = function(input, init){
+      var url = typeof input === 'string' ? input : ((input && input.url) || '');
+      var isManifest = /tiny_face_detector_model-weights_manifest\.json(\?.*)?$/i.test(url);
+      var isBin = /tiny_face_detector_model\.bin(\?.*)?$/i.test(url);
+      if(!isManifest && !isBin) return rawFetch.apply(window, arguments);
+      /* 模型内联包按需加载；加载完成前先把这个 fetch 挂起，避免走真实网络 */
+      return new Promise(function(resolve, reject){
+        ensureInlineModel(function(ok){
+          var M = window.EN10_FACE_MODEL;
+          if(!ok || !M){
+            rawFetch.call(window, input, init).then(resolve, reject);
+            return;
+          }
+          if(isManifest){
+            resolve({
+              ok:true, status:200,
+              json:function(){ return Promise.resolve(JSON.parse(M.manifest)); },
+              text:function(){ return Promise.resolve(M.manifest); },
+              arrayBuffer:function(){ return Promise.resolve(new TextEncoder().encode(M.manifest).buffer); }
+            });
+          } else {
+            var bytes = base64ToBytes(M.weights);
+            resolve({
+              ok:true, status:200,
+              arrayBuffer:function(){ return Promise.resolve(bytes.buffer); },
+              json:function(){ return Promise.reject(new Error('not json')); },
+              text:function(){ return Promise.resolve(''); }
+            });
+          }
+        });
+      });
+    };
+    window.__EN10FaceFetchShim = true;
+  }
+  /* 必须赶在 face-api 脚本之前替换 fetch：它在脚本初始化时就会抓住全局 fetch */
+  installFaceFetchShim();
+
   function ensureFaceApi(cb){
     if(window.faceapi && cam.ready){ cb(true); return; }
     if(cam.loading){
@@ -180,8 +237,13 @@
     function loadModel(f){
       try{ cam.backend = (f.tf && f.tf.getBackend && f.tf.getBackend()) || 'cpu'; }catch(e){ cam.backend = 'cpu'; }
       var model = 'vendor/faceapi/model';
-      f.nets.tinyFaceDetector.loadFromUri(model).then(function(){ done(true); })
-        .catch(function(){ done(false); });
+      ensureInlineModel(function(){
+        f.nets.tinyFaceDetector.loadFromUri(model).then(function(){ done(true); })
+          .catch(function(err){
+            console.warn('face model load failed', err);
+            done(false);
+          });
+      });
     }
     if(window.faceapi){
       pickBackend(window.faceapi, function(){ loadModel(window.faceapi); });
@@ -207,9 +269,13 @@
       camTip('当前浏览器不支持摄像头', true);
       return;
     }
-    navigator.mediaDevices.getUserMedia({ video:{ width:{ideal:1280}, height:{ideal:720}, facingMode:'user' }, audio:false })
+    var vc = { width:{ideal:1280}, height:{ideal:720} };
+    if(cam.deviceId) vc.deviceId = { exact:cam.deviceId };
+    else vc.facingMode = 'user';
+    navigator.mediaDevices.getUserMedia({ video:vc, audio:false })
       .then(function(stream){
         cam.stream = stream;
+        try{ cam.deviceId = stream.getVideoTracks()[0].getSettings().deviceId || cam.deviceId; }catch(e){}
         video.srcObject = stream;
         video.play().catch(function(){});
         camTip('');
@@ -227,6 +293,28 @@
         var denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
         camTip(denied ? '摄像头权限被拒绝，请在浏览器设置里允许后重试' : '未检测到可用摄像头', true);
       });
+  }
+
+  function switchCamera(){
+    if(!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices){
+      camTip('当前环境不支持切换摄像头', true);
+      return;
+    }
+    navigator.mediaDevices.enumerateDevices().then(function(list){
+      var cams = list.filter(function(d){ return d.kind === 'videoinput'; });
+      if(cams.length < 2){ camTip('只检测到一个摄像头', true); setTimeout(function(){ camTip(''); }, 1600); return; }
+      var idx = -1;
+      cams.forEach(function(d, i){ if(d.deviceId === cam.deviceId) idx = i; });
+      var next = cams[(idx + 1) % cams.length];
+      stopCamera();
+      cam.deviceId = next.deviceId;
+      cam.ready = cam.ready;   /* 模型已加载，不用重新加载 */
+      startCamera();
+      camTip('正在切换到' + (next.label || ('摄像头 ' + ((idx + 2) % cams.length + 1))) + '…');
+      setTimeout(function(){ camTip(''); }, 1800);
+    }).catch(function(){
+      camTip('读取摄像头列表失败', true);
+    });
   }
 
   function stopCamera(){

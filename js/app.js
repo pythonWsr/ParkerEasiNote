@@ -622,13 +622,19 @@ function drawShapeEl(c, el){
     c.restore();
 }
 
-/* 选择工具：点中图片直接进选框（可拖动/四角缩放），笔迹仍然用套索圈选 */
+/* 选择工具：点中图片直接进选框（可拖动 / 双指捏合缩放 / 拉四角），笔迹仍然用套索圈选 */
 function hitImageAt(x, y){
     var els = getElements();
+    if(!els) return null;
+    /* 从数组末尾往前找：后画的在上层，点到重叠区域时应该选中“看得见的那张” */
     for(var i = els.length - 1; i >= 0; i--){
         var el = els[i];
         if(!el || el.type !== 'image' || !el.img) continue;
-        if(x >= el.x && x <= el.x + el.w && y >= el.y && y <= el.y + el.h) return el;
+        if(el.hidden || el.visible === false) continue;
+        var x1 = Math.min(el.x, el.x + el.w), x2 = Math.max(el.x, el.x + el.w);
+        var y1 = Math.min(el.y, el.y + el.h), y2 = Math.max(el.y, el.y + el.h);
+        if(x2 - x1 < 2 || y2 - y1 < 2) continue;
+        if(x >= x1 && x <= x2 && y >= y1 && y <= y2) return el;
     }
     return null;
 }
@@ -652,7 +658,24 @@ function beginImageSelection(el, x, y){
 
 function handleSelectStart(x, y) {
     const obj = S.selection.object;
-    
+
+    function startMove(){
+        S.selection.dragMode = 'move';
+        S.selection.dragStart = { x: x, y: y };
+        S.selection.startRect = { x: obj.x, y: obj.y, w: obj.w, h: obj.h };
+    }
+    function insideObj(){
+        var x1 = Math.min(obj.x, obj.x + obj.w), x2 = Math.max(obj.x, obj.x + obj.w);
+        var y1 = Math.min(obj.y, obj.y + obj.h), y2 = Math.max(obj.y, obj.y + obj.h);
+        return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+    }
+    function pointInRect(el){
+        var x1 = Math.min(el.x, el.x + el.w), x2 = Math.max(el.x, el.x + el.w);
+        var y1 = Math.min(el.y, el.y + el.h), y2 = Math.max(el.y, el.y + el.h);
+        return x >= x1 && x <= x2 && y >= y1 && y <= y2;
+    }
+
+    /* ① 选中框的四角手柄：优先级最高，避免手柄压在图片上时又去重选图片 */
     if (obj) {
         const handleR = 30;
         const corners = [
@@ -661,7 +684,6 @@ function handleSelectStart(x, y) {
             { name: 'sw', x: obj.x, y: obj.y + obj.h },
             { name: 'se', x: obj.x + obj.w, y: obj.y + obj.h }
         ];
-        
         for (var i=0; i<corners.length; i++) {
             var c = corners[i];
             if (Math.hypot(x - c.x, y - c.y) <= handleR) {
@@ -671,21 +693,27 @@ function handleSelectStart(x, y) {
                 return;
             }
         }
-        
-        if (x >= obj.x && x <= obj.x + obj.w && y >= obj.y && y <= obj.y + obj.h) {
-            S.selection.dragMode = 'move';
-            S.selection.dragStart = { x: x, y: y };
-            S.selection.startRect = { x: obj.x, y: obj.y, w: obj.w, h: obj.h };
-            return;
-        }
-        
-        commitSelection();
     }
 
-    /* 图片优先：点中图片直接可拖动/缩放，不用先圈选 */
-    var imgEl = hitImageAt(x, y);
-    if(imgEl){ beginImageSelection(imgEl, x, y); return; }
+    /* ② 已经有一个选中框：
+          · 套索组合 → 点框内移动整组，内部图片不抢焦点
+          · 单张图片 → 点到它自己才移动；若上面压了更新的图片，改选上层那张 */
+    if (obj && insideObj()) {
+        if (!obj.direct) { startMove(); return; }
+        var topAtPoint = hitImageAt(x, y);
+        if (!topAtPoint || topAtPoint === obj.el) { startMove(); return; }
+    }
 
+    /* ③ 图片：从最上层往下命中，点中即进入可拖动/缩放状态 */
+    var imgEl = hitImageAt(x, y);
+    if (imgEl) {
+        if (obj) commitSelection();
+        beginImageSelection(imgEl, x, y);
+        return;
+    }
+
+    /* ④ 空白处：提交旧选区，开始套索 */
+    if (obj) commitSelection();
     S.selection.isLassoing = true;
     S.selection.lassoPoints = [{ x: x, y: y }];
 }
@@ -758,8 +786,78 @@ function handleSelectEnd() {
     }
 }
 
-function createSelectionFromLasso(points) {
-    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+/* ===== 选中内容：双指直接缩放 =====
+   选中一张图片（或套索选区）后，两指在画布上捏合即可缩放，不必去找四角手柄——
+   手柄只有 30 px 的命中区，触屏上本来就难对准，双指才是本能动作。
+   尺寸用「初始距离 → 目标尺寸」的绝对映射，不累积每帧增量，所以不会越捏越偏；
+   两指中点同时参与定位，捏合时内容稳稳停在手指之间，不会从画面里跑掉。 */
+function selPtrs(){
+    if(!S.selPtrs) S.selPtrs = new Map();
+    return S.selPtrs;
+}
+function selPtrList(){
+    var out = [];
+    if(S.selPtrs) S.selPtrs.forEach(function(v){ out.push(v); });
+    return out;
+}
+function selPinchMid(){
+    var pr = selPtrList();
+    if(pr.length < 2) return null;
+    return { x:(pr[0].x + pr[1].x) / 2, y:(pr[0].y + pr[1].y) / 2 };
+}
+function startSelPinch(){
+    var obj = S.selection.object, pr = selPtrList();
+    if(!obj || pr.length < 2) return false;
+    var d0 = Math.hypot(pr[0].x - pr[1].x, pr[0].y - pr[1].y);
+    /* 两指几乎并拢时 d/d0 的分母太小，轻微抖动就会翻倍：先要求张开一点再接管 */
+    if(d0 < 40) return false;
+    var m0 = selPinchMid();
+    var c0 = coords({ clientX:m0.x, clientY:m0.y });
+    S.selPinch = {
+        d0: d0,
+        rect: { x:obj.x, y:obj.y, w:obj.w, h:obj.h },
+        /* 中点落在选框内的相对位置（0~1）：缩放时这个点固定在两指之间 */
+        fx: (c0.x - obj.x) / (obj.w || 1),
+        fy: (c0.y - obj.y) / (obj.h || 1)
+    };
+    S.selection.dragMode = null;
+    S.selection.isLassoing = false;
+    S.selection.lassoPoints = [];
+    return true;
+}
+function moveSelPinch(){
+    var p = S.selPinch, obj = S.selection.object, pr = selPtrList();
+    if(!p || !obj || pr.length < 2) return;
+    var d = Math.hypot(pr[0].x - pr[1].x, pr[0].y - pr[1].y);
+    if(d < 8) return;
+    /* 0.85 次方压一下灵敏度：大屏上两指本来就张得开，线性倍数轻轻一动就翻倍 */
+    var k = Math.pow(d / p.d0, 0.85);
+    var w = Math.max(24, Math.min(12000, p.rect.w * k));
+    var h = Math.max(24, Math.min(12000, p.rect.h * k));
+    var m = selPinchMid();
+    var c = coords({ clientX:m.x, clientY:m.y });
+    obj.x = c.x - w * p.fx;
+    obj.y = c.y - h * p.fy;
+    obj.w = w;
+    obj.h = h;
+    redraw();
+}
+function endSelPinch(){
+    S.selPinch = null;
+    var obj = S.selection.object;
+    if(obj && obj.direct && obj.el){
+        var el = obj.el;
+        var changed = (Math.abs(el.x - obj.x) > 0.5 || Math.abs(el.y - obj.y) > 0.5 ||
+                       Math.abs(el.w - obj.w) > 0.5 || Math.abs(el.h - obj.h) > 0.5);
+        el.x = obj.x; el.y = obj.y;
+        el.w = Math.max(16, obj.w); el.h = Math.max(16, obj.h);
+        if(changed) pushHistory();
+        invalidateInk();
+    }
+    redraw();
+}
+
+function createSelectionFromLasso(points) {    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     points.forEach(function(p){
         if (p.x < minX) minX = p.x;
         if (p.y < minY) minY = p.y;
@@ -1070,8 +1168,15 @@ function onDown(e){
     }
     
     if(S.tool==='select'){
-        const touch = (e.touches && e.touches[0]) || e;
-        const p = coords(touch);
+        const p = coords(e);
+        var sid = (e.pointerId != null) ? e.pointerId : 'mouse';
+        selPtrs().set(sid, { x:e.clientX, y:e.clientY });
+        if(S.selPtrs.size === 1) S.selMainId = sid;
+        /* 第二根手指落下：已有选中框就直接进入捏合缩放，不再重选、也不开始套索 */
+        if(S.selPtrs.size >= 2){
+            if(S.selection.object) startSelPinch();
+            return;
+        }
         handleSelectStart(p.x, p.y);
         return;
     }
@@ -1136,8 +1241,12 @@ function onMove(e){
     }
 
     if(S.tool==='select'){
-        const t = (e.touches && e.touches[0]) || e;
-        handleSelectMove(coords(t).x, coords(t).y);
+        if(S.selPtrs && S.selPtrs.has(e.pointerId)) S.selPtrs.set(e.pointerId, { x:e.clientX, y:e.clientY });
+        if(S.selPinch){ moveSelPinch(); return; }
+        /* 两根手指都在按：单指逻辑先让位，避免第二根手指把选中框拖走 */
+        if(S.selPtrs && S.selPtrs.size > 1) return;
+        const p = coords(e);
+        handleSelectMove(p.x, p.y);
         return;
     }
     if(S.tool==='shape') return;
@@ -1215,6 +1324,15 @@ function onMove(e){
 function onUp(e){
     D.cursor.style.display = 'none';
     if(S.tool==='select'){
+        var sid = (e.pointerId != null) ? e.pointerId : 'mouse';
+        if(S.selPtrs) S.selPtrs.delete(sid);
+        if(S.selPinch){
+            /* 手指少于两根就结束这次捏合：把新尺寸写回元素并记一步撤销 */
+            if(!S.selPtrs || S.selPtrs.size < 2) endSelPinch();
+            return;
+        }
+        /* 还有别的手指按着，这次 up 不当作手势结束 */
+        if(S.selPtrs && S.selPtrs.size > 0) return;
         handleSelectEnd();
         return;
     }
@@ -1439,6 +1557,10 @@ function clearSelectionAndSwitch(toolName) {
     if (S.selection.object) commitSelection();
     /* 换工具时把还没抬手的笔迹收掉，避免旧笔迹继续跟着手指画 */
     if (S.touches && S.touches.size) abortTouches();
+    /* 双指缩放的中间状态不能跨工具残留，否则换个工具第一笔就被当成第二根手指 */
+    S.selPtrs = null;
+    S.selPinch = null;
+    S.selMainId = null;
     S.tool = toolName;
     setActiveToolUI();
 }
@@ -1552,7 +1674,8 @@ function bindShapeSubmenu(scope){
 $('tool-select').onclick = function(){
     closeSubmenu();
     clearSelectionAndSwitch('select');
-    toast('套索选择：拖动圈选，可拖动或四角缩放','fa-arrow-pointer');
+    if(S.mode === 'ppt') toast('选择模式：点击幻灯片里的音频、视频即可播放或暂停','fa-arrow-pointer');
+    else toast('套索选择：拖动圈选；选中后拖动移动，双指捏合缩放（也可拉四角）','fa-arrow-pointer');
 };
 
 $('tool-undo').onclick = function(){ 
@@ -1565,16 +1688,10 @@ $('tool-more').onclick = function(e){
     e.stopPropagation();
     /* 更多：Win8 磁贴面板（3D 飞入 + 背景模糊） */
     if(window.EN10Tiles){
-        try{
-            closeSubmenu();
-            if(S.tool !== 'more') clearSelectionAndSwitch('more');
-            window.EN10Tiles.toggle();
-            return;
-        }catch(err){
-            /* WebView 等环境里磁贴面板若抛错，退回旧子菜单，至少保证“更多”可用 */
-            console.error(err);
-            try{ EN10.toast('更多面板打开失败：' + ((err && err.message) || err), 'fa-exclamation-triangle'); }catch(_){}
-        }
+        closeSubmenu();
+        if(S.tool !== 'more') clearSelectionAndSwitch('more');
+        window.EN10Tiles.toggle();
+        return;
     }
     if(S.submenuTarget === e.currentTarget && !D.submenu.classList.contains('hide')){ closeSubmenu(); return; }
     if(S.tool !== 'more') clearSelectionAndSwitch('more');
@@ -2302,10 +2419,20 @@ function importPDF(file){
                 img.src = data;
                 newPages.push({bg:'#ffffff',elements:[{type:'image',img:img,src:data,x:(CW-drawW)/2,y:(CH-drawH)/2,w:drawW,h:drawH}]});
             }
-            S.mode='whiteboard'; S.ppt=null; S.pages=newPages; S.pageIdx=0; S.history=[];
-            updatePptUi(false); $('menu-exit-ppt').classList.add('hidden');
+            /* 追加而不是覆盖：之前写的白板页、批注全部保留 */
+            var oldCount = (S.pages || []).length;
+            if(!S.pages) S.pages = [];
+            var startIdx = S.pages.length;
+            S.pages = S.pages.concat(newPages);
+            S.mode = 'whiteboard';
+            S.ppt = null;
+            S.doc = null;
+            S.pageIdx = startIdx;
+            document.body.classList.remove('ppt-mode', 'doc-mode');
+            updatePptUi(false);
+            $('menu-exit-ppt').classList.add('hidden');
             updateBg(); redraw(); updatePageInd(); updatePageThumbnails();
-            toast('PDF 已导入，共 '+newPages.length+' 页','fa-check');
+            toast(oldCount ? ('PDF 已追加 ' + newPages.length + ' 页，原有 ' + oldCount + ' 页保留') : ('PDF 已导入，共 ' + newPages.length + ' 页'), 'fa-check');
         }).catch(function(err){ toast('PDF 读取失败：'+(err.message||'未知错误'),'fa-exclamation-triangle'); });
     };
     reader.readAsArrayBuffer(file);
@@ -2320,6 +2447,20 @@ function openFileDialog(){
 function openAnyFile(f){
     if(!f) return;
     var ext = (f.name.split('.').pop() || '').toLowerCase();
+    /* 先按“真的能打开”的白名单过滤，避免选到冷门格式后一路静默失败 */
+    var known = /^(pptx|docx|pdf|zip|pnbx|course|ppt|doc|txt|md|png|jpg|jpeg|gif|webp|bmp|svg)$/i;
+    var isImage = /^image\//i.test(f.type || '');
+    if(!known.test(ext) && !isImage){
+        openModal({
+            title:'暂不支持这种文件',
+            content:'<div style="font-size:13px;line-height:1.8;color:#444;text-align:left">' +
+                '“' + (f.name || '所选文件') + '” 无法在白板里打开。<br>' +
+                '<b>支持：</b>PPT（.pptx）、Word（.docx）、PDF、图片（png / jpg / gif / webp / bmp / svg）、' +
+                '文本（.txt / .md）以及白板课件（.pnbx / .zip）。</div>',
+            actions:[{id:'close',label:'知道了',type:'confirm'}]
+        });
+        return;
+    }
     if(ext === 'pptx') return importPptx(f);
     if(ext === 'docx') return importDocx(f);
     if(ext === 'pdf') return importPDF(f);
@@ -2416,7 +2557,10 @@ function openZipLike(file){
 function mimeOf(path){
     var ext = (String(path).split('.').pop() || '').toLowerCase();
     var map = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', bmp:'image/bmp',
-        svg:'image/svg+xml', webp:'image/webp', emf:'image/emf', wmf:'image/wmf', tif:'image/tiff', tiff:'image/tiff' };
+        svg:'image/svg+xml', webp:'image/webp', emf:'image/emf', wmf:'image/wmf', tif:'image/tiff', tiff:'image/tiff',
+        mp4:'video/mp4', m4v:'video/mp4', webm:'video/webm', ogv:'video/ogg', mov:'video/quicktime',
+        avi:'video/x-msvideo', wmv:'video/x-ms-wmv', mpg:'video/mpeg', mpeg:'video/mpeg',
+        mp3:'audio/mpeg', m4a:'audio/mp4', wav:'audio/wav', ogg:'audio/ogg', oga:'audio/ogg', aac:'audio/aac', wma:'audio/x-ms-wma' };
     return map[ext] || 'image/png';
 }
 
@@ -2439,6 +2583,10 @@ function ensureSlideImages(slide){
     }
     (slide.shapes || []).forEach(function(s){
         if(s.type === 'image' && !s.src) resolveShapeImage(s);
+        if(s.type === 'media'){
+            if(s.imgPath && !s.src) resolveShapeImage(s);
+            if(!s.mediaUrl) resolveShapeMedia(s);
+        }
     });
 }
 
@@ -2454,6 +2602,32 @@ function resolveShapeImage(s){
         return s.src;
     }).catch(function(){ return ''; });
     return s._imgPromise;
+}
+
+/* 幻灯片里的音视频：优先 blob URL（大文件也不占内存字符串），失败再退回 data URL */
+function resolveShapeMedia(s){
+    if(!s) return Promise.resolve('');
+    if(s.mediaUrl) return Promise.resolve(s.mediaUrl);
+    if(s._mediaPromise) return s._mediaPromise;
+    if(!s.mediaPath || !S.ppt || !S.ppt.zip){ s._mediaPromise = Promise.resolve(''); return s._mediaPromise; }
+    var f = S.ppt.zip.file(s.mediaPath);
+    if(!f){ s._mediaPromise = Promise.resolve(''); return s._mediaPromise; }
+    var mime = s.mime || mimeOf(s.mediaPath);
+    var readBytes = f.async('uint8array').then(function(bytes){
+        if(window.Blob && window.URL && URL.createObjectURL){
+            var blob = new Blob([bytes], { type: mime });
+            s.mediaUrl = URL.createObjectURL(blob);
+            return s.mediaUrl;
+        }
+        throw new Error('no blob');
+    });
+    s._mediaPromise = readBytes.catch(function(){
+        return f.async('base64').then(function(b64){
+            s.mediaUrl = 'data:' + mime + ';base64,' + b64;
+            return s.mediaUrl;
+        });
+    }).catch(function(){ return ''; });
+    return s._mediaPromise;
 }
 
 function parsePPTX(file){
@@ -2524,7 +2698,12 @@ function parsePPTX(file){
         }
         function guessMime(path) {
             var ext = (path.split('.').pop() || '').toLowerCase();
-            var map = { png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', bmp:'image/bmp', svg:'image/svg+xml' };
+            var map = {
+                png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', bmp:'image/bmp', svg:'image/svg+xml',
+                mp4:'video/mp4', m4v:'video/mp4', webm:'video/webm', ogv:'video/ogg', mov:'video/quicktime',
+                avi:'video/x-msvideo', wmv:'video/x-ms-wmv', mpg:'video/mpeg', mpeg:'video/mpeg',
+                mp3:'audio/mpeg', m4a:'audio/mp4', wav:'audio/wav', ogg:'audio/ogg', oga:'audio/ogg', aac:'audio/aac', wma:'audio/x-ms-wma'
+            };
             return map[ext] || 'application/octet-stream';
         }
 
@@ -2915,10 +3094,28 @@ function parsePPTX(file){
                     var blip = blipFill ? firstDirect(blipFill, 'blip') : firstDirect(node, 'blip');
                     var rId = blip ? (getAttr(blip, 'r:embed') || getAttr(blip, 'embed')) : '';
                     var target = rId ? resolveRel(relsDoc, rId) : '';
-                    if (!target) return Promise.resolve(Object.assign({}, base, { type:'shape', text:'', paragraphs:[] }));
-                    var imgPath = normalizePath(slideDir + '/x', target);
+                    var posterPath = target ? normalizePath(slideDir + '/x', target) : '';
+
+                    /* 视频 / 音频：p:pic 里挂 a:videoFile 或 a:audioFile，真正的媒体在 rels 里 */
+                    var nvPicPr = firstDirect(node, 'nvPicPr');
+                    var nvPr = nvPicPr ? firstDirect(nvPicPr, 'nvPr') : null;
+                    var mediaNode = nvPr ? (firstDirect(nvPr, 'videoFile') || firstDirect(nvPr, 'audioFile')) : null;
+                    if (mediaNode) {
+                        var isVideo = getLocalName(mediaNode) === 'videoFile';
+                        var mRid = getAttr(mediaNode, 'r:link') || getAttr(mediaNode, 'link') || getAttr(mediaNode, 'r:embed');
+                        var mTarget = mRid ? resolveRel(relsDoc, mRid) : '';
+                        if (!mTarget) return Promise.resolve(null);
+                        var mediaPath = normalizePath(slideDir + '/x', mTarget);
+                        return Promise.resolve(Object.assign({}, base, {
+                            type:'media', mediaKind: isVideo ? 'video' : 'audio',
+                            mediaPath: mediaPath, mime: guessMime(mediaPath),
+                            imgPath: posterPath, posterMime: posterPath ? guessMime(posterPath) : ''
+                        }));
+                    }
+
+                    if (!posterPath) return Promise.resolve(Object.assign({}, base, { type:'shape', text:'', paragraphs:[] }));
                     /* 图片延后解码：先出结构，滑到这一页时再读 zip，避免一次性解析全部图片 */
-                    return Promise.resolve(Object.assign({}, base, { type:'image', imgPath: imgPath, mime: guessMime(imgPath) }));
+                    return Promise.resolve(Object.assign({}, base, { type:'image', imgPath: posterPath, mime: guessMime(posterPath) }));
                 }
 
                 var txBody = firstDirect(node, 'txBody'), textInfo = parseTextBody(txBody, style);
@@ -3192,8 +3389,6 @@ function updateBg(){
         applyCamView();
     }
     document.body.classList.toggle('camera-mode', S.mode === 'camera');
-    var fz = document.getElementById('btn-freeze');
-    if(fz) fz.classList.toggle('on', !!S.cameraFrozen);
     redraw();
 }
 
@@ -3273,6 +3468,32 @@ function mkPptShape(s, visible){
         }
         el.style.background = 'rgba(0,0,0,.04)';
         el.dataset.shapeId = s.id;
+        return el;
+    }
+
+    /* 音视频：用原生控件，放映时切到「选择」即可点击播放 */
+    if (s.type === 'media') {
+        var mediaWrap = document.createElement('div');
+        mediaWrap.className = 'ppt-media' + (s.mediaKind === 'audio' ? ' is-audio' : '');
+        var mediaEl;
+        if (s.mediaKind === 'video') {
+            mediaEl = document.createElement('video');
+            mediaEl.controls = true;
+            mediaEl.playsInline = true;
+            mediaEl.setAttribute('playsinline', '');
+            mediaEl.preload = 'metadata';
+            if (s.imgPath) resolveShapeImage(s).then(function(url){ if(url) mediaEl.poster = url; });
+        } else {
+            mediaEl = document.createElement('audio');
+            mediaEl.controls = true;
+            mediaEl.preload = 'metadata';
+        }
+        mediaEl.className = 'ppt-media-el';
+        mediaWrap.appendChild(mediaEl);
+        el.appendChild(mediaWrap);
+        resolveShapeMedia(s).then(function(url){ if(url) mediaEl.src = url; });
+        el.dataset.shapeId = s.id;
+        el.dataset.media = s.mediaKind || 'video';
         return el;
     }
 
@@ -4368,6 +4589,7 @@ $('btn-camera').onclick = function(){
         if (getUserMedia) {
             getUserMedia.call(navigator, { video: true }, function(stream) {
                 S.cameraStream = stream;
+                try{ S.cameraDeviceId = stream.getVideoTracks()[0].getSettings().deviceId || ''; }catch(e){}
                 S.mode = 'camera';
                 resetCamView();
                 updateBg(); redraw();
@@ -4385,6 +4607,7 @@ $('btn-camera').onclick = function(){
     // 现代标准 API
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } }).then(function(stream){
         S.cameraStream = stream;
+        try{ S.cameraDeviceId = stream.getVideoTracks()[0].getSettings().deviceId || ''; }catch(e){}
         S.mode = 'camera';
         resetCamView();
         updateBg(); redraw();
@@ -4400,9 +4623,10 @@ $('btn-camera').onclick = function(){
         }
     });
 };
-$('btn-freeze').onclick = function(e){
+$('btn-shot').onclick = function(e){
     e.stopPropagation();
-    toggleFreeze();
+    if(window.EN10Video && EN10Video.snapshot) EN10Video.snapshot();
+    else toast('视频展台还没准备好','fa-camera');
 };
 
 function toggleFreeze(){
@@ -4430,7 +4654,7 @@ function toggleFreeze(){
     toast('画面已冻结，可以直接在上面批注','fa-snowflake');
 }
 
-function stopCamera(){
+function stopCamera(silent){
     if(S.cameraStream){
         S.cameraStream.getTracks().forEach(function(t){t.stop();});
         S.cameraStream = null;
@@ -4440,7 +4664,8 @@ function stopCamera(){
     S.mode = 'whiteboard';
     updateBg(); redraw();
     $('btn-camera').classList.remove('on');
-    toast('视频展台已关闭','fa-camera');
+    /* 拍照插入时调用方自己会提示结果，这里就别再叠一条 */
+    if(!silent) toast('视频展台已关闭','fa-camera');
 }
 
 var narrowTimer = 0;
@@ -6494,7 +6719,7 @@ function renderMarkdown(src){
 function insertImageEl(src, w, h, opts){
     opts = opts || {};
     var maxW = CW * 0.78, maxH = CH * 0.78;
-    var scale = Math.min(maxW / (w || 1), maxH / (h || 1), 1);
+    var scale = opts.exact ? 1 : Math.min(maxW / (w || 1), maxH / (h || 1), 1);
     if(opts.scale) scale *= opts.scale;
     var iw = Math.max(40, (w || 400) * scale);
     var ih = Math.max(40, (h || 300) * scale);
@@ -6577,7 +6802,7 @@ function askImage(dataUrl, defaultQ){
 }
 
 window.EN10 = {
-    S: S, D: D, ctx: ctx,
+    S: S, D: D, ctx: ctx, CW: CW, CH: CH,
     toast: toast,
     openModal: openModal,
     closeModal: closeModal,
@@ -6593,11 +6818,34 @@ window.EN10 = {
     escapeHtml: escapeHtml,
     renderMarkdown: renderMarkdown,
     insertImage: insertImageEl,
+    /* 新增白板页（视频展台拍照后落到新页用）；PPT / 文档模式没有页的概念，返回 -1 */
+    addPage: function(bg){
+        if(S.mode === 'ppt' || S.mode === 'doc'){
+            toast('当前模式无法加页', 'fa-exclamation-triangle');
+            return -1;
+        }
+        if(S.mode === 'prep'){
+            S.prep.pages.splice(S.prepIdx + 1, 0, { bg:'#ffffff', elements:[], ink:[], name:'第' + (S.prep.pages.length + 1) + '页' });
+            S.prepIdx++;
+            S.prepSel = null;
+            renderPrep();
+            return S.prepIdx;
+        }
+        S.pages.push({ bg: bg || '#0F261E', elements: [] });
+        S.pageIdx = S.pages.length - 1;
+        S.selection.object = null;
+        updateBg(); redraw(); updatePageInd(); updatePageThumbnails();
+        return S.pageIdx;
+    },
     aiChat: aiChatRequest,
     aiCfg: aiCfg,
     aiEndpoint: aiEndpoint,
     applyCamView: applyCamView,
     resetCamView: resetCamView,
+    stopCamera: stopCamera,
+    /* 丢弃还没抬手的笔迹：视频展台落下第二根手指、判定为双指缩放时调用，
+       避免第一根手指已经起的那个小点在拍照时被一起收进画面 */
+    cancelInk: abortTouches,
     currentBg: function(){ return getBg(); },
     openImage: function(){ D.fileImage.value=''; D.fileImage.click(); },
     openWeb: function(){ openWebExtModal(); },

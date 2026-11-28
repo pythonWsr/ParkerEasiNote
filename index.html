@@ -39,7 +39,7 @@
         <button class="left-fab glass" id="btn-menu" title="菜单"><i class="fas fa-bars"></i></button>
         <button class="left-fab glass" id="btn-save" title="保存"><i class="fas fa-download"></i></button>
         <button class="left-fab glass" id="btn-camera" title="视频展台"><i class="fas fa-camera"></i></button>
-        <button class="left-fab glass" id="btn-freeze" title="冻结画面"><i class="fas fa-snowflake"></i></button>
+        <button class="left-fab glass" id="btn-shot" title="拍照并插入新页"><i class="fas fa-camera-retro"></i></button>
     </div>
     <div id="left-menu-panel">
         <button class="menu-item" data-m="about"><i class="fas fa-info-circle"></i>关于</button>
@@ -126,10 +126,11 @@
     <div id="picker-layer" aria-hidden="true"></div>
     <div id="subject-layer" aria-hidden="true"></div>
 
-    <input type="file" id="file-image" accept="image/*,.svg,.pdf,.txt,.md" style="display:none">
-    <input type="file" id="file-ppt" accept=".pptx,.docx,.pdf,.zip,.pnbx,.ppt,.doc" style="display:none">
-    <input type="file" id="file-any" accept="*/*" style="display:none">
-    <input type="file" id="file-prep-image" accept="image/*" style="display:none">
+    <!-- 只列真正能打开的类型，避免选到不支持的文件后才发现打不开 -->
+    <input type="file" id="file-image" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml,.pdf,.txt,.md" style="display:none">
+    <input type="file" id="file-ppt" accept=".pptx,.docx,.pdf,.zip,.pnbx,.course,.ppt,.doc" style="display:none">
+    <input type="file" id="file-any" accept=".pptx,.docx,.pdf,.zip,.pnbx,.course,.ppt,.doc,.txt,.md,.png,.jpg,.jpeg,.gif,.webp,.bmp,.svg" style="display:none">
+    <input type="file" id="file-prep-image" accept="image/png,image/jpeg,image/gif,image/webp,image/bmp,image/svg+xml" style="display:none">
 </div>
 
 <script src="vendor/jszip.min.js"></script>
@@ -163,5 +164,6 @@ window.MathJax = { tex:{ inlineMath:[['$','$'],['\\(','\\)']] }, svg:{ fontCache
 <script src="js/features/subjects-sci.js"></script>
 <script src="js/features/subjects-dict.js"></script>
 <script src="js/features/mindmap.js"></script>
+<script src="js/features/piano.js"></script>
 </body>
 </html>

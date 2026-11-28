@@ -381,7 +381,7 @@
       body:
         '<div class="rule-tools">' +
           '<input class="field" id="rl-text" value="' + esc(text) + '" placeholder="输入英文内容" style="max-width:320px">' +
-          '<label class="lbl" style="margin:0">字号</label>' +
+          '<label class="lbl" style="margin:0">格高</label>' +
           '<input type="range" class="set-range" id="rl-size" min="24" max="120" value="' + size + '" style="width:130px">' +
           '<div class="chips" id="rl-colors"></div>' +
         '</div>' +
@@ -416,55 +416,105 @@
           cv.className = 'tool-canvas';
           draw();
         }
+        var FONT = '"ENHand","Comic Sans MS","Segoe Print","Bradley Hand",cursive';
+        /* 用字体真实的 x-height 反推字号：让字母主体正好填满中格 */
+        function xRatio(){
+          c.font = '100px ' + FONT;
+          var m = c.measureText('x');
+          var asc = m.actualBoundingBoxAscent;
+          return (asc && asc > 4) ? asc / 100 : 0.52;
+        }
+        function wrapLines(t, maxW, fsz){
+          c.font = '400 ' + fsz + 'px ' + FONT;
+          var out = [];
+          String(t == null ? '' : t).split('\n').forEach(function(par){
+            if(!par){ out.push(''); return; }
+            var words = par.split(/(\s+)/), cur = '';
+            words.forEach(function(w){
+              var test = cur + w;
+              if(c.measureText(test).width > maxW && cur){
+                out.push(cur.replace(/\s+$/, ''));
+                cur = w.replace(/^\s+/, '');
+              } else cur = test;
+            });
+            if(c.measureText(cur).width > maxW){
+              var line = '';
+              for(var i = 0; i < cur.length; i++){
+                var t2 = line + cur[i];
+                if(c.measureText(t2).width > maxW && line){ out.push(line); line = cur[i]; }
+                else line = t2;
+              }
+              cur = line;
+            }
+            out.push(cur);
+          });
+          return out;
+        }
         function draw(){
           if(!c) return;
           var W = cvs.w, H = cvs.h;
           c.clearRect(0, 0, W, H);
           c.fillStyle = '#fff'; c.fillRect(0, 0, W, H);
-          /* 按画布比例排版：小屏也不会挤成一条 */
           var padX = Math.max(14, Math.round(W * 0.05));
-          var top = Math.round(H * 0.14);
-          var lineGap = Math.max(24, (H * 0.70) / 3);
-          var fsz = Math.min(size, Math.max(18, lineGap * 0.92));
-          c.strokeStyle = '#4A6FA5'; c.lineWidth = 1.2;
-          for(var i = 0; i <= 3; i++){
-            var y = top + i * lineGap;
-            c.beginPath();
-            c.moveTo(padX, y); c.lineTo(W - padX, y);
-            c.stroke();
-          }
-          // 中格淡底，帮助识别书写区
-          c.fillStyle = 'rgba(31,111,235,.03)';
-          c.fillRect(padX, top + lineGap, W - padX * 2, lineGap);
-          c.fillStyle = color;
-          c.textBaseline = 'alphabetic';
-          c.textAlign = 'left';
+          var top = Math.max(10, Math.round(H * 0.06));
+          var foot = 26;
+          var avail = Math.max(60, H - top - foot);
           var maxW = W - padX * 2;
-          var font = '400 ' + fsz + 'px "ENHand","Comic Sans MS","Segoe Print",cursive';
-          c.font = font;
-          var lines = [], cur = '';
-          for(var k = 0; k < text.length; k++){
-            var ch = text[k];
-            if(ch === '\n'){ lines.push(cur); cur = ''; continue; }
-            var t2 = cur + ch;
-            if(c.measureText(t2).width > maxW && cur){ lines.push(cur); cur = ch; }
-            else cur = t2;
+
+          /* size 是「中格高度」；字号、四线间距都由它推出来，三者永远同步。
+             用二分找“放得下的最大格高”，避免先按大字号换行、再越缩越小 */
+          var xr = xRatio();
+          function measure(u){
+            var f = u / xr;
+            var ls = wrapLines(text, maxW, f);
+            var g = u * 0.55;
+            return { u:u, fsz:f, lines:ls, gap:g, need:ls.length * 3 * u + (ls.length - 1) * g };
           }
-          if(cur) lines.push(cur);
-          var baseY = top + lineGap * 2.1;
-          lines.slice(0, 4).forEach(function(line, i){
-            var by = baseY + i * lineGap;
-            if(by > H - 20) return;
-            // 逐字绘制：让字母落在基线，形成书写感
+          var best = null, lo = 7, hi = Math.max(7, size);
+          for(var it = 0; it < 15; it++){
+            var mid = (lo + hi) / 2;
+            var m = measure(mid);
+            if(m.need <= avail){ best = m; lo = mid; }
+            else hi = mid;
+          }
+          if(!best) best = measure(7);
+          var u = best.u, fsz = best.fsz, lines = best.lines, gap = best.gap;
+          var total = best.need;
+          var y0 = top + Math.max(0, (avail - total) / 2);
+
+          lines.forEach(function(line, i){
+            var t = y0 + i * (3 * u + gap);
+            /* 四条线：上 / 中上 / 基线 / 下 */
+            for(var k = 0; k <= 3; k++){
+              c.beginPath();
+              c.strokeStyle = k === 2 ? 'rgba(74,111,165,.95)' : 'rgba(74,111,165,.55)';
+              c.lineWidth = k === 2 ? 1.6 : 1;
+              c.moveTo(padX, t + k * u);
+              c.lineTo(W - padX, t + k * u);
+              c.stroke();
+            }
+            /* 中格淡底，提示字母主体范围 */
+            c.fillStyle = 'rgba(31,111,235,.045)';
+            c.fillRect(padX, t + u, maxW, u);
+
+            c.font = '400 ' + fsz + 'px ' + FONT;
+            c.fillStyle = color;
+            c.textBaseline = 'alphabetic';
+            c.textAlign = 'left';
+            /* 基线 = 第三条线；字母主体正好落在中格，上扬/下沉笔画自然进上下格 */
+            var baseline = t + 2 * u;
             var x = padX;
             for(var j = 0; j < line.length; j++){
-              var cw = c.measureText(line[j]).width;
-              c.fillText(line[j], x, by);
-              x += cw;
+              var ch = line[j];
+              var cw = c.measureText(ch).width;
+              c.fillText(ch, x, baseline);
+              x += cw + Math.max(0.4, u * 0.012);
             }
           });
-          c.fillStyle = '#C6D0DA'; c.font = '12px "PingFang SC",sans-serif';
-          c.fillText('四线三格 · ParkerEasiNote', padX, H - 18);
+          c.fillStyle = '#C6D0DA';
+          c.font = '12px "PingFang SC",sans-serif';
+          c.textBaseline = 'alphabetic';
+          c.fillText('四线三格 · ParkerEasiNote', padX, H - 10);
         }
         input.addEventListener('input', function(){ text = input.value; draw(); });
         range.addEventListener('input', function(){ size = +range.value; draw(); });
