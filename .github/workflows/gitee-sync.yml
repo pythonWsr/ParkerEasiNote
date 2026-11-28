@@ -145,13 +145,14 @@ jobs:
             | python3 -c 'import json,sys;print(" ".join(a.get("name","") for a in (json.load(sys.stdin).get("assets") or [])))' \
             2>/dev/null || true)
 
+          FAILED=""
           for f in dist/*; do
             [ -f "$f" ] || continue
             BASE=$(basename "$f")
             case " $EXISTING " in
               *" $BASE "*) echo "已存在，跳过 $BASE"; continue ;;
             esac
-            CODE=$(curl -sS --max-time 900 --retry 3 --retry-delay 5 \
+            CODE=$(curl -sS --http1.1 --max-time 120 --retry 1 --retry-delay 5 \
               -o /tmp/gitee-attach.out -w '%{http_code}' \
               -X POST "$API/releases/$ID/attach_files" \
               -F "access_token=$TOKEN" \
@@ -159,8 +160,12 @@ jobs:
             if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
               echo "已上传 $BASE (HTTP $CODE)"
             else
-              echo "::error::上传 $BASE 失败 HTTP $CODE"
+              echo "::warning::上传 $BASE 失败 HTTP $CODE"
               cat /tmp/gitee-attach.out || true
-              exit 1
+              FAILED="$FAILED $BASE"
             fi
           done
+          if [ -n "$FAILED" ]; then
+            echo "::error::以下附件上传失败:$FAILED"
+            exit 1
+          fi
