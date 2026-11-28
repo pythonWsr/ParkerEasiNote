@@ -6,6 +6,21 @@
   var esc = S._esc;
 
   var COLORS = ['#2DC360', '#2C6BE0', '#FF9500', '#AF52DE', '#D9362B', '#0AA5A5'];
+  var FILLS = ['#FFFFFF', '#F0F7F3', '#E8F1FF', '#FFF3E0', '#F5EBFF', '#FFECEA', '#E6F7F7', '#2DC360', '#16241D'];
+  var FONTS = [
+    { n:'默认', v:"'PingFang SC','Microsoft YaHei',sans-serif" },
+    { n:'黑体', v:"'Microsoft YaHei','PingFang SC','Heiti SC',sans-serif" },
+    { n:'宋体', v:"'Songti SC','SimSun',serif" },
+    { n:'楷体', v:"'Kaiti SC','KaiTi','STKaiti',serif" },
+    { n:'圆体', v:"'Yuanti SC','YouYuan','Arial Rounded MT Bold',sans-serif" },
+    { n:'等宽', v:"ui-monospace,Menlo,Consolas,monospace" }
+  ];
+  function textOn(fill){
+    var h = String(fill || '#fff').replace('#','');
+    if(h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+    var r = parseInt(h.substr(0,2),16)||255, g = parseInt(h.substr(2,2),16)||255, b = parseInt(h.substr(4,2),16)||255;
+    return (r*0.299 + g*0.587 + b*0.114) < 150 ? '#FFFFFF' : '#1E2C25';
+  }
 
   S.mindmap = function(){
     var nodes = [];
@@ -14,7 +29,15 @@
     var wrap, stage, svg, canvasWrap;
 
     function add(text, parent, x, y, color){
-      var n = { id:++seq, text:text, parent:parent, x:x, y:y, color:color || COLORS[0], collapsed:false };
+      var p = parent == null ? null : byId(parent);
+      var n = {
+        id:++seq, text:text, parent:parent, x:x, y:y,
+        color:color || COLORS[0], collapsed:false,
+        /* fill 与 color 分开：color 管连线/描边，fill 管节点底色 */
+        fill: parent == null ? (color || COLORS[0]) : '#FFFFFF',
+        font: p ? p.font : FONTS[0].v,
+        fs: p ? p.fs : 14
+      };
       nodes.push(n);
       return n;
     }
@@ -46,12 +69,17 @@
             '<button data-a="child"><i class="fas fa-plus"></i> 子节点</button>' +
             '<button data-a="sibling">同级</button>' +
             '<button data-a="del">删除</button>' +
-            '<button data-a="color">换色</button>' +
+            '<button data-a="color">描边</button>' +
+            '<button data-a="fill">填充</button>' +
+            '<button data-a="font">字体</button>' +
+            '<button data-a="fminus" title="字号 -">A-</button>' +
+            '<button data-a="fplus" title="字号 +">A+</button>' +
             '<button data-a="zin" title="放大"><i class="fas fa-magnifying-glass-plus"></i></button>' +
             '<button data-a="zout" title="缩小"><i class="fas fa-magnifying-glass-minus"></i></button>' +
             '<button data-a="fit">居中</button>' +
             '<span class="mm-zoom" id="mm-zoom">100%</span>' +
           '</div>' +
+          '<div class="mm-palette" id="mm-pal"></div>' +
         '</div>',
       hint:'滚轮/双指缩放，空白处拖动画布；选中节点后 Tab 新建子节点、Enter 新建同级，双击节点改字。',
       insert:{ label:'插入导图', get:function(api){
@@ -111,8 +139,8 @@
           canvasWrap.innerHTML = nodes.map(function(n){
             var cls = 'mm-node' + (n.id === sel ? ' on' : '') + (n.parent == null ? ' root' : '');
             var st = 'left:' + n.x + 'px;top:' + n.y + 'px;';
-            if(n.parent != null) st += 'border-color:' + n.color + '55;';
-            if(n.parent === null) st += 'background:' + n.color + ';border-color:' + n.color + ';';
+            st += 'background:' + n.fill + ';border-color:' + n.color + (n.parent == null ? '' : '66') + ';';
+            st += 'color:' + textOn(n.fill) + ';font-family:' + n.font + ';font-size:' + n.fs + 'px;';
             return '<div class="' + cls + '" data-id="' + n.id + '" style="' + st + '">' + esc(n.text) +
               (n.parent == null ? '' : '<span class="mm-add" data-add="' + n.id + '">+</span>') + '</div>';
           }).join('');
@@ -232,6 +260,36 @@
           if(!n) return;
           var i = COLORS.indexOf(n.color);
           n.color = COLORS[(i + 1) % COLORS.length];
+          /* 中心主题的底色跟描边一起变，避免“绿框配旧底色” */
+          if(n.parent == null) n.fill = n.color;
+          paint();
+        }
+        function togglePalette(btn){
+          var pal = wrap.querySelector('#mm-pal');
+          if(!pal) return;
+          pal.innerHTML = FILLS.map(function(c){
+            return '<button data-f="' + c + '" style="background:' + c + '" title="' + c + '"></button>';
+          }).join('');
+          pal.classList.toggle('on');
+          if(!pal.classList.contains('on')) return;
+          var r = btn.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+          pal.style.left = Math.max(6, Math.min(wr.width - 190, r.left - wr.left)) + 'px';
+          pal.style.bottom = (wr.bottom - r.top + 6) + 'px';
+        }
+        function cycleFont(){
+          var n = byId(sel);
+          if(!n) return;
+          var i = 0;
+          FONTS.forEach(function(f, k){ if(f.v === n.font) i = k; });
+          var next = FONTS[(i + 1) % FONTS.length];
+          n.font = next.v;
+          paint();
+          EN10.toast('字体：' + next.n, 'fa-font');
+        }
+        function bumpFont(delta){
+          var n = byId(sel);
+          if(!n) return;
+          n.fs = Math.max(10, Math.min(32, (n.fs || 14) + delta));
           paint();
         }
         function fit(){
@@ -246,6 +304,10 @@
           else if(a === 'sibling') addSibling();
           else if(a === 'del') del();
           else if(a === 'color') cycleColor();
+          else if(a === 'fill') togglePalette(b);
+          else if(a === 'font') cycleFont();
+          else if(a === 'fminus') bumpFont(-1);
+          else if(a === 'fplus') bumpFont(1);
           else if(a === 'fit') fit();
           else if(a === 'zin') zoomAt(wrap.clientWidth / 2, wrap.clientHeight / 2, 1.25);
           else if(a === 'zout') zoomAt(wrap.clientWidth / 2, wrap.clientHeight / 2, 1 / 1.25);
@@ -253,7 +315,7 @@
 
         /* 空白处拖动平移；滚轮缩放 */
         wrap.addEventListener('pointerdown', function(e){
-          if(e.target.closest('.mm-node') || e.target.closest('.mm-toolbar')) return;
+          if(e.target.closest('.mm-node') || e.target.closest('.mm-toolbar') || e.target.closest('.mm-palette')) return;
           sel = null;
           canvasWrap.querySelectorAll('.mm-node.on').forEach(function(x){ x.classList.remove('on'); });
           pan = { x:e.clientX, y:e.clientY, vx:view.x, vy:view.y };
@@ -297,6 +359,16 @@
           zoomAt(cx, cy, target / view.s);
         }, { passive:false });
         wrap.addEventListener('touchend', function(){ pinch = null; });
+
+        wrap.querySelector('#mm-pal').addEventListener('click', function(e){
+          var b = e.target.closest('button[data-f]');
+          if(!b) return;
+          var n = byId(sel);
+          if(!n) return;
+          n.fill = b.dataset.f;
+          wrap.querySelector('#mm-pal').classList.remove('on');
+          paint();
+        });
 
         document.addEventListener('keydown', function onKey(e){
           if(!document.body.contains(wrap)){ document.removeEventListener('keydown', onKey); return; }
@@ -349,10 +421,11 @@
             c.arcTo(x, y + m.h, x, y, r);
             c.arcTo(x, y, x + m.w, y, r);
             c.closePath();
-            if(m.n.parent == null){ c.fillStyle = m.n.color; c.fill(); }
-            else { c.fillStyle = '#fff'; c.fill(); c.strokeStyle = m.n.color + '77'; c.lineWidth = 1.6; c.stroke(); }
-            c.fillStyle = m.n.parent == null ? '#fff' : '#1E2C25';
-            c.font = (m.n.parent == null ? '800 ' : '600 ') + '14px "PingFang SC","Microsoft YaHei",sans-serif';
+            c.fillStyle = m.n.fill || '#FFFFFF'; c.fill();
+            c.strokeStyle = m.n.color + (m.n.parent == null ? '' : '77'); c.lineWidth = 1.6;
+            if(m.n.parent != null || m.n.fill !== m.n.color) c.stroke();
+            c.fillStyle = textOn(m.n.fill || '#FFFFFF');
+            c.font = (m.n.parent == null ? '800 ' : '600 ') + (m.n.fs || 14) + 'px ' + (m.n.font || FONTS[0].v);
             c.textAlign = 'center'; c.textBaseline = 'middle';
             c.fillText(m.n.text, x + m.w / 2, y + m.h / 2, m.w - 12);
           });

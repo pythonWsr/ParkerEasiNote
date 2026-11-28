@@ -45,7 +45,7 @@
         '</div>' +
         '<div class="subject-body">' +
           '<div class="subject-pane" id="sj-pane">' + (opts.body || '') + '</div>' +
-          (opts.side ? '<div class="subject-side" id="sj-side"><div class="side-grip" data-side-close><span></span></div>' + opts.side + '</div>' : '') +
+          (opts.side ? '<div class="subject-side" id="sj-side">' + opts.side + '</div>' : '') +
         '</div>' +
         (opts.hint ? '<div class="subject-foot"><span class="hint">' + opts.hint + '</span></div>' : '') +
       '</div>';
@@ -60,26 +60,40 @@
     var sideEl = layer.querySelector('#sj-side');
     if(paneEl && paneEl.querySelector('.canvas-wrap')) paneEl.classList.add('fit');
 
-    /* 窄屏工具抽屉 */
+    /* 参数栏常驻右侧（和电脑版一致），按钮只负责“收起/展开”，不再做成抽屉 */
     var sb = layer.querySelector('#sj-sidebtn');
     if(sb && sideEl){
+      /* 侧栏标题统一补一个图标，参数区一眼能扫到 */
+      var ICONS = [
+        [/颜色|色彩|填充/, 'fa-palette'],
+        [/粗细|笔宽|笔迹/, 'fa-pen-nib'],
+        [/字号|字体|文字/, 'fa-font'],
+        [/模板|常用公式|公式库/, 'fa-bookmark'],
+        [/写法|提示|说明/, 'fa-circle-info'],
+        [/行星|星球|天体/, 'fa-globe'],
+        [/视角|镜头|相机/, 'fa-eye'],
+        [/图层|顺序|排列/, 'fa-layer-group'],
+        [/背景|底色/, 'fa-fill-drip'],
+        [/数据|表格|统计/, 'fa-table'],
+        [/朗读|语音|发音/, 'fa-volume-high'],
+        [/音乐|节奏|钢琴/, 'fa-music'],
+        [/参数|设置|调节/, 'fa-sliders']
+      ];
+      sideEl.querySelectorAll('.side-title').forEach(function(t){
+        if(t.querySelector('i')) return;
+        var txt = t.textContent || '';
+        var ic = 'fa-list-ul';
+        for(var i = 0; i < ICONS.length; i++){
+          if(ICONS[i][0].test(txt)){ ic = ICONS[i][1]; break; }
+        }
+        t.insertAdjacentHTML('afterbegin', '<i class="fas ' + ic + '"></i>');
+      });
       sb.onclick = function(e){
         e.stopPropagation();
-        var willOpen = !sideEl.classList.contains('open');
-        sideEl.classList.toggle('open', willOpen);
-        sb.classList.toggle('on', willOpen);
-        if(willOpen) sideEl.scrollTop = 0;
+        var off = card.classList.toggle('side-off');
+        sb.classList.toggle('on', !off);
       };
-      /* 抽屉开着时不要让点击把它收走：参数要能连续调、能上下滚 */
       sideEl.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
-    }
-
-    if(sideEl){
-      var grip = sideEl.querySelector('[data-side-close]');
-      if(grip) grip.onclick = function(){
-        sideEl.classList.remove('open');
-        if(sb) sb.classList.remove('on');
-      };
     }
 
     var api = {
@@ -108,6 +122,7 @@
       }
     };
     cur = api;
+    if(opts.onClose) api.onClose = opts.onClose;
     if(opts.onMount) opts.onMount(api);
 
     if(opts.insert){
@@ -128,14 +143,6 @@
 
   function escHandler(e){
     if(e.key !== 'Escape' || !cur) return;
-    var side = document.getElementById('sj-side');
-    if(side && side.classList.contains('open')){
-      side.classList.remove('open');
-      var b = document.getElementById('sj-sidebtn');
-      if(b) b.classList.remove('on');
-      e.stopPropagation();
-      return;
-    }
     close();
     document.removeEventListener('keydown', escHandler);
   }

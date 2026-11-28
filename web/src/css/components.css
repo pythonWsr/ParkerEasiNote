@@ -97,8 +97,8 @@
 }
 
 /* ===================== 2. 计时器 / 倒计时 ===================== */
-#timer-fab{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:6200;
-  display:flex;align-items:center;gap:9px;height:36px;padding:0 15px 0 12px;border-radius:var(--r-pill);
+#timer-fab{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:6950;
+  display:flex;align-items:center;gap:8px;height:36px;padding:0 9px 0 12px;border-radius:var(--r-pill);
   background:rgba(10,20,16,.5);border:1px solid rgba(255,255,255,.18);color:#fff;cursor:pointer;
   -webkit-backdrop-filter:blur(14px) saturate(150%);backdrop-filter:blur(14px) saturate(150%);
   font-variant-numeric:tabular-nums;font-size:15px;font-weight:700;letter-spacing:.6px;
@@ -110,6 +110,10 @@
 #timer-fab.warn i,#timer-fab.warn .tval{color:#FFB340}
 #timer-fab.done{border-color:rgba(255,59,48,.65);animation:timerPulse 1s ease-in-out infinite}
 #timer-fab.done i,#timer-fab.done .tval{color:#FF6B63}
+#timer-fab .t-x{display:flex;align-items:center;justify-content:center;width:19px;height:19px;flex:0 0 19px;
+  border-radius:50%;background:rgba(255,255,255,.13);color:rgba(255,255,255,.7);font-size:9px;cursor:pointer;transition:all .16s}
+#timer-fab .t-x:hover{background:rgba(255,92,80,.85);color:#fff}
+#timer-fab .t-x:active{transform:scale(.9)}
 @keyframes timerPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,.4)}50%{box-shadow:0 0 0 12px rgba(255,59,48,0)}}
 
 #timer-layer{position:fixed;inset:0;z-index:6900;display:none}
@@ -141,6 +145,7 @@
 .t-start.paused{background:var(--warn)}
 .t-reset{background:var(--paper-3);color:var(--text-2);flex:0 0 56px!important}
 .t-full{background:#1E2C25;color:#fff;flex:0 0 56px!important}
+.t-hide{background:var(--paper-3);color:var(--text-2);flex:0 0 56px!important}
 
 /* 全屏计时 */
 .timer-big{position:fixed;inset:0;z-index:9600;display:none;align-items:center;justify-content:center;flex-direction:column;
@@ -578,6 +583,8 @@
 .vp-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   transform-origin:50% 50%;will-change:transform;transition:transform .18s var(--e-out);touch-action:none}
 .vp-media video,.vp-media img{width:100%;height:100%;object-fit:contain;display:block}
+/* 捏合过程中必须关掉过渡，否则画面永远慢手指半拍，看着就是「一会儿大一会儿小」 */
+body.cam-pinching .vp-media{transition:none}
 body.cam-moving .vp-media{transition:none;will-change:transform}
 body.cam-moving #drawing-board{pointer-events:none!important}
 body.cam-moving #bg{touch-action:none}
@@ -677,8 +684,9 @@ body.tool-select-mode.touch-ui #drawing-board{cursor:none}
 .fx-key{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;height:46px;
   border-radius:10px;border:1px solid #E6EBF0;background:#fff;font-family:inherit;cursor:pointer;
   transition:transform .12s,background .16s,border-color .16s}
-.fx-key b{font-size:15px;font-weight:600;color:var(--text-1);line-height:1.1}
-.fx-key span{font-size:10px;color:var(--text-3)}
+.fx-key b{font-size:15px;font-weight:600;color:var(--text-1);line-height:1.1;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;letter-spacing:0}
+.fx-key span{font-size:10px;color:var(--text-3);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fx-key:hover{background:var(--brand-50);border-color:var(--brand-line)}
 .fx-key:active{transform:scale(.94)}
 .fx-prev{flex:0 0 40%;min-width:0;display:flex;flex-direction:column;gap:8px;min-height:0}
@@ -725,3 +733,259 @@ body.tool-select-mode.touch-ui #drawing-board{cursor:none}
   .fx-prevbox{padding:8px}
   .fx-err{font-size:10px;min-height:0}
 }
+
+/* ===================== 10. PPT 音视频 ===================== */
+#bg-layer .ppt-stage .ppt-media{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  background:#000;overflow:hidden}
+#bg-layer .ppt-stage .ppt-media .ppt-media-el{display:block;max-width:100%;max-height:100%}
+#bg-layer .ppt-stage .ppt-media video.ppt-media-el{width:100%;height:100%;object-fit:contain;background:#000}
+#bg-layer .ppt-stage .ppt-media audio.ppt-media-el{width:100%;height:54px}
+#bg-layer .ppt-stage .ppt-media.is-audio{background:linear-gradient(150deg,#F4F8F6,#E7EFEA)}
+
+/* ===================== 11. 更多 · 二级菜单（新） ===================== */
+/* 不用 grid / gap / 3D，纯 flex + 位移淡入，老内核也能正常显示 */
+.mt-scene{position:absolute;inset:0;display:flex;flex-direction:column;color:#fff;
+  padding:16px clamp(10px,3vw,40px) 12px;opacity:0;transform:translateY(10px);
+  transition:opacity .18s ease-out,transform .18s ease-out}
+#tiles-layer.on .mt-scene{opacity:1;transform:none}
+#tiles-layer.leaving .mt-scene{opacity:0;transform:translateY(6px)}
+.mt-head{display:flex;align-items:flex-end;justify-content:space-between;flex:0 0 auto;margin-bottom:10px}
+.mt-title{font-size:22px;font-weight:800;letter-spacing:.5px;line-height:1.1}
+.mt-title small{display:block;margin-top:3px;font-size:10px;font-weight:500;letter-spacing:2px;color:rgba(255,255,255,.5)}
+.mt-close{width:40px;height:40px;flex:0 0 40px;border-radius:50%;border:1px solid rgba(255,255,255,.24);
+  background:rgba(255,255,255,.1);color:#fff;font-size:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.mt-close:hover{background:rgba(255,255,255,.22)}
+.mt-close:active{transform:scale(.92)}
+.mt-cols{flex:1;min-height:0;display:flex;flex-wrap:wrap;align-content:stretch;overflow:hidden;
+  background:rgba(10,20,16,.5);border:1px solid rgba(255,255,255,.14);border-radius:20px;
+  box-shadow:0 18px 50px rgba(0,0,0,.32);padding:6px}
+.mt-col{display:flex;flex-direction:column;min-width:0;box-sizing:border-box;padding:4px 4px 6px}
+.mt-col-head{display:flex;align-items:center;height:22px;flex:0 0 auto;padding:0 5px;margin-bottom:2px;
+  font-size:11px;font-weight:800;letter-spacing:1.2px;color:rgba(255,255,255,.62)}
+.mt-col-head i{display:flex;margin-right:5px;opacity:.9}
+.mt-body{flex:1;min-height:0;display:flex;flex-direction:column}
+.mt-item{flex:1 1 0;min-height:0;display:flex;align-items:center;margin:2px 0;padding:0 7px;
+  border:0;border-radius:10px;background:rgba(255,255,255,.06);color:#fff;font-family:inherit;
+  cursor:pointer;text-align:left;transition:background .14s,transform .14s;overflow:hidden}
+.mt-item:last-child{margin-bottom:0}
+.mt-item span{min-width:0;line-height:1.15;font-weight:600;letter-spacing:.2px;overflow:hidden}
+.mt-ic{display:flex;flex:0 0 auto;margin-right:6px;opacity:.95}
+.mt-item:hover{background:rgba(255,255,255,.17)}
+.mt-item:active{transform:scale(.97)}
+.mt-compact .mt-title small{display:none}
+.mt-compact .mt-head{margin-bottom:6px}
+.mt-compact .mt-title{font-size:17px}
+.mt-compact .mt-close{width:32px;height:32px;flex-basis:32px;font-size:13px}
+.mt-compact .mt-col-head{height:18px;font-size:10px;letter-spacing:.6px}
+@media (max-height:320px){
+  .mt-scene{padding:6px 8px 6px}
+  .mt-col{padding:2px 3px 4px}
+  .mt-item{border-radius:8px;margin:1px 0}
+}
+
+/* ===================== 12. 视频展台底部工具 ===================== */
+#cam-tools{display:none;align-items:center;margin-left:4px;padding-left:4px;border-left:1px solid rgba(255,255,255,.16)}
+body.camera-mode #cam-tools{display:flex}
+body.camera-mode #tool-select,body.camera-mode #tool-shape,
+body.camera-mode #tool-more,body.camera-mode #tool-ai{display:none!important}
+.cam-btn{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  width:44px;height:48px;border:0;border-radius:22px;background:transparent;color:rgba(255,255,255,.72);
+  font-family:inherit;cursor:pointer;padding:0;margin:0 1px;flex-shrink:0;transition:background .16s,color .16s,transform .14s}
+.cam-btn i{font-size:16px;margin-bottom:1px}
+.cam-btn span{font-size:8.5px;line-height:1}
+.cam-btn:hover{background:rgba(255,255,255,.14);color:#fff}
+.cam-btn.on{background:var(--brand);color:#fff}
+.cam-btn:active{transform:scale(.9)}
+#cam-tools .cam-zoom{min-width:38px;text-align:center;font-size:10.5px;color:rgba(255,255,255,.62);
+  font-variant-numeric:tabular-nums;padding:0 2px}
+@media (max-width:760px){
+  .cam-btn{width:38px;height:40px}
+  .cam-btn span{display:none}
+  .cam-btn i{font-size:15px;margin:0}
+  #cam-tools .cam-zoom{min-width:32px;font-size:9.5px}
+}
+/* 极矮屏（手机横屏、投屏条）：底栏和左下按钮组在同一水平线上会互相压住，
+   把底栏抬到按钮组上方，谁也不挡谁——这比缩小底栏更好按 */
+@media (max-height:340px){
+  #bottom-toolbar{bottom:80px}
+  #bottom-left{bottom:14px;height:48px}
+  #bottom-right{bottom:14px;height:48px}
+  #bottom-left .left-fab{width:44px;height:44px}
+}
+
+/* ===================== 13. 学科工具 · 常驻右侧参数栏 ===================== */
+.side-title{display:flex;align-items:center;gap:6px}
+.side-title i{font-size:11px;color:var(--brand-600);flex:0 0 auto}
+.s-sidebtn{display:inline-flex!important}
+.s-sidebtn.on{background:var(--brand-50);border-color:var(--brand-line);color:var(--brand-700)}
+.subject-card.side-off .subject-side{display:none!important}
+.subject-side{width:240px;flex:0 0 240px}
+@media (max-width:900px),(max-height:640px){
+  /* 不再做底部抽屉：始终停靠右侧，窄屏只收窄宽度 */
+  .subject-body{flex-direction:row}
+  .subject-side{position:relative;left:auto;right:auto;top:auto;bottom:auto;
+    width:38%;flex:0 0 38%;min-width:132px;max-width:220px;max-height:none;
+    transform:none;border-left:1px solid var(--paper-3);border-top:0;border-radius:0;
+    box-shadow:none;padding:10px;z-index:auto}
+  .subject-side.open{transform:none}
+  .subject-card.side-off .subject-side{display:none}
+  .subject-pane{padding:8px}
+  .side-title{font-size:10px;letter-spacing:.8px}
+  .side-block{margin-bottom:12px}
+  .subject-side .field,.subject-side .area{font-size:12px}
+}
+@media (max-width:560px){
+  .subject-side{width:42%;flex:0 0 42%;min-width:126px;padding:8px}
+}
+
+/* ===================== 14. 思维导图 · 填充 / 字体 ===================== */
+.mm-palette{position:absolute;z-index:6;display:none;flex-wrap:wrap;width:178px;padding:7px;
+  background:#fff;border:1px solid #E0E8EF;border-radius:13px;box-shadow:0 12px 30px rgba(15,38,30,.16)}
+.mm-palette.on{display:flex}
+.mm-palette button{width:26px;height:26px;margin:3px;padding:0;border-radius:8px;
+  border:1px solid rgba(20,40,30,.14);cursor:pointer;transition:transform .12s}
+.mm-palette button:hover{transform:scale(1.1);box-shadow:0 0 0 2px rgba(45,195,96,.35)}
+.mm-toolbar button[data-a="fminus"],.mm-toolbar button[data-a="fplus"]{padding:0 9px;font-family:var(--font-num)}
+
+/* ===================== 15. 化学方程式 · 气体/沉淀 ===================== */
+.chem-sp{cursor:pointer;border-radius:4px;padding:0 1px;transition:background .14s}
+.chem-sp:hover{background:#E8F6EE}
+.chem-sp:active{background:#D8EFE1}
+.chem-mark{font-size:.62em;vertical-align:super;margin-left:1px;color:#C0392B;font-weight:800;line-height:0}
+
+/* ===================== 16. 钢琴 ===================== */
+.pn-wrap{display:flex;flex-direction:column;height:100%;min-height:0;gap:9px}
+.pn-bar{display:flex;align-items:center;flex-wrap:wrap;gap:6px;flex:0 0 auto}
+.pn-btn{height:34px;padding:0 13px;border-radius:10px;border:1px solid #DFE7ED;background:#fff;color:var(--text-2);
+  font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  transition:all .15s}
+.pn-btn:hover{border-color:var(--brand-line);color:var(--brand-700);background:var(--brand-50)}
+.pn-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.pn-btn.primary:hover{filter:brightness(1.05);color:#fff}
+.pn-btn.primary.on{background:#D9362B;border-color:#D9362B}
+.pn-btn.ghost{width:34px;padding:0;justify-content:center;color:var(--text-3)}
+.pn-btn.ghost:hover{color:var(--danger);border-color:#F3C9C4;background:#FFF4F2}
+.pn-btn:active{transform:scale(.96)}
+.pn-status{margin-left:auto;font-size:11.5px;color:var(--text-3);font-variant-numeric:tabular-nums}
+.pn-status.rec{color:#D9362B;font-weight:800}
+.pn-status.rec::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#D9362B;
+  margin-right:5px;animation:pnBlink 1s steps(2,end) infinite}
+.pn-status.play{color:var(--brand-700);font-weight:800}
+@keyframes pnBlink{50%{opacity:0}}
+.pn-keys{position:relative;flex:1 1 auto;min-height:140px;max-height:300px;border-radius:14px;
+  overflow-x:auto;overflow-y:hidden;background:#0E1A14;
+  box-shadow:inset 0 2px 10px rgba(0,0,0,.45);
+  /* 88 键放不下一屏：允许横向滑动查看，轻点仍然正常弹奏 */
+  touch-action:pan-x;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+.pn-keys::-webkit-scrollbar{height:8px}
+.pn-keys::-webkit-scrollbar-track{background:transparent}
+.pn-keys::-webkit-scrollbar-thumb{background:rgba(255,255,255,.22);border-radius:4px}
+.pn-keys::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.34)}
+.pn-keys-in{position:relative;height:100%;min-height:100%}
+.pn-range{display:flex;align-items:center;gap:6px;flex:0 0 auto;flex-wrap:wrap}
+.pn-range .chip{height:26px;padding:0 10px;font-size:11.5px}
+.pn-range-tip{margin-left:auto;font-size:10.5px;color:var(--text-4,#A9B4BC);white-space:nowrap}
+.pn-key{position:absolute;top:0;box-sizing:border-box;font-family:inherit;cursor:pointer;padding:0;margin:0;
+  -webkit-tap-highlight-color:transparent;user-select:none;touch-action:pan-x}
+.pn-key.white{bottom:0;background:linear-gradient(#FFFFFF,#EDF2EF);border:0;border-right:1px solid #C8D4CD;
+  border-radius:0 0 7px 7px;z-index:1;box-shadow:inset 0 -6px 10px rgba(20,40,30,.07)}
+.pn-key.white:hover{background:linear-gradient(#F7FFFB,#E4F3EA)}
+.pn-key.white.down{background:linear-gradient(#D6F0E0,#BFE6CE);box-shadow:inset 0 3px 8px rgba(20,60,40,.2)}
+.pn-key.white em{position:absolute;left:0;right:0;bottom:5px;font-style:normal;font-size:9px;font-weight:700;
+  color:#93A39A;letter-spacing:.4px;text-align:center}
+.pn-key.black{height:62%;background:linear-gradient(#2C3A33,#0A120E);border-radius:0 0 6px 6px;z-index:2;
+  box-shadow:0 4px 8px rgba(0,0,0,.45),inset 0 -3px 0 rgba(255,255,255,.1)}
+.pn-key.black:hover{background:linear-gradient(#3B4D44,#111C16)}
+.pn-key.black.down{background:linear-gradient(#4C6B5A,#1D3027);transform:translateY(2px)}
+.pn-hint{flex:0 0 auto;font-size:11px;color:var(--text-3);line-height:1.6;padding:0 2px 2px}
+.pn-hint b{font-family:var(--font-num);color:var(--text-2);font-weight:700}
+.pn-tip{font-size:11px;color:var(--text-3);line-height:1.65;margin-top:6px}
+.pn-tip b{color:var(--brand-700)}
+@media (max-height:460px){
+  .pn-hint{display:none}
+  .pn-wrap{gap:5px}
+  .pn-keys{min-height:64px}
+  .pn-bar{gap:4px}
+  .pn-btn{height:28px;padding:0 9px;font-size:11.5px}
+  .pn-btn.ghost{width:28px}
+  .pn-status{font-size:10.5px}
+  /* 矮屏先把音域条的余量榨干，键盘必须留在屏幕里 */
+  .pn-range .chip{height:22px;padding:0 8px;font-size:10.5px}
+  .pn-range-tip{display:none}
+}
+@media (max-height:300px){
+  .pn-range{display:none}
+  .pn-keys{min-height:56px}
+}
+
+/* ===================== 17. 关于页 · 流动模糊光晕 ===================== */
+/* 只用 radial-gradient + filter:blur + transform，避开 conic-gradient/mix-blend-mode */
+.glow{position:absolute;inset:-18%;z-index:0;pointer-events:none;overflow:hidden;
+  background:
+    radial-gradient(62% 52% at 18% 10%,rgba(45,195,96,.24),transparent 72%),
+    radial-gradient(52% 46% at 88% 26%,rgba(44,107,224,.22),transparent 74%),
+    radial-gradient(58% 52% at 26% 92%,rgba(175,82,222,.2),transparent 74%),
+    radial-gradient(46% 42% at 82% 88%,rgba(255,179,64,.16),transparent 76%),#07110D}
+.glow span{position:absolute;width:62%;height:62%;border-radius:50%;
+  filter:blur(46px);-webkit-filter:blur(46px);opacity:.78;
+  background:radial-gradient(circle at 50% 50%,rgba(45,195,96,.9) 0%,rgba(45,195,96,.35) 42%,rgba(45,195,96,0) 70%);
+  will-change:transform;animation:glowA 19s ease-in-out infinite alternate}
+.glow .g1{left:-10%;top:-14%}
+.glow .g2{right:-16%;top:4%;width:50%;height:50%;opacity:.55;
+  background:radial-gradient(circle at 50% 50%,rgba(44,107,224,.85) 0%,rgba(44,107,224,.28) 45%,rgba(44,107,224,0) 72%);
+  animation:glowB 23s ease-in-out infinite alternate}
+.glow .g3{left:8%;bottom:-20%;width:52%;height:52%;opacity:.5;
+  background:radial-gradient(circle at 50% 50%,rgba(175,82,222,.78) 0%,rgba(175,82,222,.24) 46%,rgba(175,82,222,0) 72%);
+  animation:glowC 26s ease-in-out infinite alternate}
+.glow .g4{right:-6%;bottom:-12%;width:44%;height:44%;opacity:.45;
+  background:radial-gradient(circle at 50% 50%,rgba(255,179,64,.8) 0%,rgba(255,179,64,.22) 46%,rgba(255,179,64,0) 72%);
+  animation:glowD 21s ease-in-out infinite alternate}
+.glow .g5{left:30%;top:26%;width:40%;height:40%;opacity:.4;
+  background:radial-gradient(circle at 50% 50%,rgba(55,214,196,.8) 0%,rgba(55,214,196,.2) 48%,rgba(55,214,196,0) 74%);
+  animation:glowE 17s ease-in-out infinite alternate}
+@keyframes glowA{
+  0%{transform:translate3d(-4%,-2%,0) scale(1)}
+  45%{transform:translate3d(8%,6%,0) scale(1.18)}
+  100%{transform:translate3d(-2%,10%,0) scale(.94)}
+}
+@keyframes glowB{
+  0%{transform:translate3d(2%,-4%,0) scale(1.05)}
+  50%{transform:translate3d(-10%,8%,0) scale(.92)}
+  100%{transform:translate3d(4%,12%,0) scale(1.16)}
+}
+@keyframes glowC{
+  0%{transform:translate3d(0,4%,0) scale(.96)}
+  50%{transform:translate3d(10%,-8%,0) scale(1.2)}
+  100%{transform:translate3d(-6%,-2%,0) scale(1.02)}
+}
+@keyframes glowD{
+  0%{transform:translate3d(-6%,2%,0) scale(1)}
+  55%{transform:translate3d(6%,-10%,0) scale(1.22)}
+  100%{transform:translate3d(-2%,-4%,0) scale(.9)}
+}
+@keyframes glowE{
+  0%{transform:translate3d(0,0,0) scale(.9)}
+  50%{transform:translate3d(-8%,6%,0) scale(1.24)}
+  100%{transform:translate3d(6%,-6%,0) scale(1)}
+}
+@media (prefers-reduced-motion:reduce){.glow span{animation:none}}
+@supports not (filter:blur(2px)){
+  .glow{background:
+    radial-gradient(60% 55% at 16% 12%,rgba(45,195,96,.35),transparent 70%),
+    radial-gradient(55% 50% at 86% 24%,rgba(44,107,224,.3),transparent 72%),
+    radial-gradient(60% 55% at 24% 88%,rgba(175,82,222,.26),transparent 72%),#07110D}
+  .glow span{display:none}
+}
+
+/* 更多菜单：条目固定高度并整体居中，避免大屏上被拉成 190px 高的大块 */
+/* 用 flex 居中 + flex:0 1 auto，空间不足时自动收缩，小屏不会顶部被裁 */
+.mt-scene{justify-content:center}
+.mt-cols{flex:0 1 auto;margin:8px 0 6px;align-self:stretch;max-height:calc(100% - 62px)}
+.mt-item{flex:0 0 auto}
+.mt-body{justify-content:flex-start}
+
+/* 更多菜单：大屏时条目变成小方块（图标在上），更像网格 */
+.mt-item.mt-big{flex-direction:column;justify-content:center;text-align:center;padding:0 4px}
+.mt-item.mt-big .mt-ic{margin:0 0 4px}
+.mt-item.mt-big span{text-align:center}
