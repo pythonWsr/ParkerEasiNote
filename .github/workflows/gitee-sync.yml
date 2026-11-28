@@ -152,7 +152,7 @@ jobs:
             case " $EXISTING " in
               *" $BASE "*) echo "已存在，跳过 $BASE"; continue ;;
             esac
-            CODE=$(curl -sS --http1.1 --max-time 120 --retry 1 --retry-delay 5 \
+            CODE=$(curl -sS --http1.1 --max-time 600 -H 'Expect:' \
               -o /tmp/gitee-attach.out -w '%{http_code}' \
               -X POST "$API/releases/$ID/attach_files" \
               -F "access_token=$TOKEN" \
