@@ -1,0 +1,158 @@
+# gitee-sync：把 main 与 Release 同步到 Gitee（pythonWsr/ParkerEasiNote）
+#
+# 触发：
+#   1. pr.py release 发布正式版时（GitHub release published）
+#   2. 手动 workflow_dispatch
+#
+# 密钥：
+#   - GITEE_SYNC_PRIVATE_KEY 已存在
+#     * 若为 SSH 私钥：只用于 git push（Release 同步会跳过并告警）
+#     * 若为 Gitee 私人令牌：同时用于 git push 与 Release API
+#   - 可选 GITEE_TOKEN：当上面的 secret 是 SSH key 时，用它做 Release API
+name: gitee-sync
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "要同步的 tag（留空则取最新 Release）"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitee-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GITEE_OWNER: pythonWsr
+      GITEE_REPO: ParkerEasiNote
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: 解析 tag 与密钥类型
+        id: prep
+        env:
+          KEY: ${{ secrets.GITEE_SYNC_PRIVATE_KEY }}
+          EXTRA_TOKEN: ${{ secrets.GITEE_TOKEN }}
+        run: |
+          set -e
+          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(gh release view --json tagName --jq .tagName)
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if printf '%s' "$KEY" | grep -q -- 'BEGIN .*PRIVATE KEY'; then
+            echo "mode=ssh" >> "$GITHUB_OUTPUT"
+            if [ -n "$EXTRA_TOKEN" ]; then
+              echo "token=$EXTRA_TOKEN" >> "$GITHUB_OUTPUT"
+            else
+              echo "token=" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "mode=token" >> "$GITHUB_OUTPUT"
+            echo "token=$KEY" >> "$GITHUB_OUTPUT"
+          fi
+          echo "同步 tag：$TAG"
+
+      - name: 配置 Gitee remote
+        id: remote
+        env:
+          KEY: ${{ secrets.GITEE_SYNC_PRIVATE_KEY }}
+          MODE: ${{ steps.prep.outputs.mode }}
+        run: |
+          set -e
+          if [ "$MODE" = "ssh" ]; then
+            mkdir -p ~/.ssh
+            printf '%s\n' "$KEY" > ~/.ssh/gitee_key
+            chmod 600 ~/.ssh/gitee_key
+            ssh-keyscan gitee.com >> ~/.ssh/known_hosts 2>/dev/null
+            eval "$(ssh-agent -s)" >/dev/null
+            ssh-add ~/.ssh/gitee_key
+            echo "remote=git@gitee.com:${GITEE_OWNER}/${GITEE_REPO}.git" >> "$GITHUB_OUTPUT"
+          else
+            echo "::add-mask::$KEY"
+            echo "remote=https://${GITEE_OWNER}:${KEY}@gitee.com/${GITEE_OWNER}/${GITEE_REPO}.git" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: 推送 main 与 tags 到 Gitee
+        run: |
+          set -e
+          git remote add gitee "${{ steps.remote.outputs.remote }}"
+          git push gitee HEAD:main --force
+          git push gitee --tags --force
+
+      - name: 下载 GitHub Release 附件
+        if: ${{ steps.prep.outputs.tag != '' }}
+        run: |
+          set -e
+          gh release download "${{ steps.prep.outputs.tag }}" --dir dist --clobber
+          ls -l dist
+
+      - name: 同步 Gitee Release
+        if: ${{ steps.prep.outputs.tag != '' }}
+        env:
+          TOKEN: ${{ steps.prep.outputs.token }}
+          TAG: ${{ steps.prep.outputs.tag }}
+        run: |
+          set -e
+          if [ -z "$TOKEN" ]; then
+            echo "::warning::当前 GITEE_SYNC_PRIVATE_KEY 是 SSH 私钥，Gitee Release API 需要私人令牌；请补充 secret GITEE_TOKEN，或把 GITEE_SYNC_PRIVATE_KEY 换成令牌。已跳过 Release 同步。"
+            exit 0
+          fi
+          echo "::add-mask::$TOKEN"
+
+          API="https://gitee.com/api/v5/repos/${GITEE_OWNER}/${GITEE_REPO}"
+          NAME=$(gh release view "$TAG" --json name --jq .name)
+          gh release view "$TAG" --json body --jq .body > notes.md
+
+          # 已存在则复用，否则创建
+          RESP=$(curl -sS "$API/releases/tags/$TAG?access_token=$TOKEN" || true)
+          ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("id") or "")
+except Exception:
+    print("")' 2>/dev/null || true)
+
+          if [ -z "$ID" ]; then
+            RESP=$(curl -sS -X POST "$API/releases" \
+              --data-urlencode "access_token=$TOKEN" \
+              --data-urlencode "tag_name=$TAG" \
+              --data-urlencode "name=$NAME" \
+              --data-urlencode "body@notes.md" \
+              --data-urlencode "target_commitish=main" \
+              --data-urlencode "prerelease=false")
+            ID=$(printf '%s' "$RESP" | python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("id") or "")
+except Exception:
+    print("")' 2>/dev/null || true)
+          fi
+
+          if [ -z "$ID" ]; then
+            echo "::error::创建 Gitee Release 失败：$RESP"
+            exit 1
+          fi
+          echo "Gitee Release id=$ID"
+
+          for f in dist/*; do
+            [ -f "$f" ] || continue
+            curl -sS -X POST "$API/releases/$ID/attach_files" \
+              -F "access_token=$TOKEN" \
+              -F "file=@$f" >/dev/null
+            echo "已上传 $(basename "$f")"
+          done
