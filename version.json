@@ -3,26 +3,26 @@
     "apk": {
       "sha256": "",
       "size": 0,
-      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.1.7/ParkerEasiNote-10.1.7.apk",
-      "version": "10.1.7"
+      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.2.7/ParkerEasiNote-10.2.7.apk",
+      "version": "10.2.7"
     },
     "dmg": {
       "sha256": "",
       "size": 0,
-      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.1.7/ParkerEasiNote-10.1.7.dmg",
-      "version": "10.1.7"
+      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.2.7/ParkerEasiNote-10.2.7.dmg",
+      "version": "10.2.7"
     },
     "exe": {
       "sha256": "",
       "size": 0,
-      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.1.7/ParkerEasiNote-10.1.7.exe",
-      "version": "10.1.7"
+      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.2.7/ParkerEasiNote-10.2.7.exe",
+      "version": "10.2.7"
     },
     "html": {
       "sha256": "",
       "size": 0,
-      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.1.7/ParkerEasiNote-10.1.7.html",
-      "version": "10.1.7"
+      "url": "https://github.com/pythonWsr/ParkerEasiNote/releases/download/v10.2.7/ParkerEasiNote-10.2.7.html",
+      "version": "10.2.7"
     },
     "ipa": {
       "sha256": "",
@@ -32,8 +32,8 @@
     }
   },
   "is_latest": true,
-  "latest": "10.1.7",
-  "release_url": "https://github.com/pythonWsr/ParkerEasiNote/releases/tag/v10.1.7",
+  "latest": "10.2.7",
+  "release_url": "https://github.com/pythonWsr/ParkerEasiNote/releases/tag/v10.2.7",
   "schema": 3,
   "tool": {
     "pr.py": {
