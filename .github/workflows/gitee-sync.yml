@@ -93,8 +93,18 @@ jobs:
         run: |
           set -e
           git remote add gitee "${{ steps.remote.outputs.remote }}"
-          git push gitee HEAD:main --force
-          git push gitee --tags --force
+          for i in 1 2 3; do
+            if git push gitee HEAD:main --force; then break; fi
+            echo "main push 失败，第 $i 次重试…"
+            sleep 20
+            [ "$i" = "3" ] && exit 1
+          done
+          for i in 1 2 3; do
+            if git push gitee --tags --force; then break; fi
+            echo "tags push 失败，第 $i 次重试…"
+            sleep 20
+            [ "$i" = "3" ] && exit 1
+          done
 
       - name: 下载 GitHub Release 附件
         if: ${{ steps.prep.outputs.tag != '' }}
